@@ -38,7 +38,8 @@ fun ReviewScreen(
     errorMessage: String?,
     onKeep: (ScreenshotItem) -> Unit,
     onDelete: (ScreenshotItem) -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     val current = screenshots.firstOrNull()
     var deleteCandidate by remember { mutableStateOf<ScreenshotItem?>(null) }
@@ -61,8 +62,13 @@ fun ReviewScreen(
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
-            TextButton(onClick = onRefresh) {
-                Text("Refresh")
+            Row {
+                TextButton(onClick = onRefresh) {
+                    Text("Refresh")
+                }
+                TextButton(onClick = onOpenSettings) {
+                    Text("Settings")
+                }
             }
         }
 
@@ -156,4 +162,3 @@ private fun ScreenshotCard(
             }
     )
 }
-

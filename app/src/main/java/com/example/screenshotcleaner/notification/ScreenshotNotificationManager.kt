@@ -28,6 +28,7 @@ class ScreenshotNotificationManager(
 
     fun showOldScreenshotsFound(count: Int) {
         val intent = Intent(context, MainActivity::class.java)
+            .setAction(ACTION_REVIEW_SCREEN)
         val pendingIntent = PendingIntent.getActivity(
             context,
             0,
@@ -47,8 +48,8 @@ class ScreenshotNotificationManager(
     }
 
     companion object {
+        const val ACTION_REVIEW_SCREEN = "com.example.screenshotcleaner.action.REVIEW_SCREEN"
         const val CHANNEL_ID = "screenshot_reminders"
         private const val OLD_SCREENSHOTS_NOTIFICATION_ID = 1001
     }
 }
-

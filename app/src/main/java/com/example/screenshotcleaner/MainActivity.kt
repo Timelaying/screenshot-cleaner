@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,9 +32,12 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.screenshotcleaner.data.repository.ScreenshotRepository
+import com.example.screenshotcleaner.data.settings.AppSettings
+import com.example.screenshotcleaner.data.settings.SettingsRepository
 import com.example.screenshotcleaner.domain.ScreenshotItem
 import com.example.screenshotcleaner.ui.onboarding.OnboardingScreen
 import com.example.screenshotcleaner.ui.review.ReviewScreen
+import com.example.screenshotcleaner.ui.settings.SettingsScreen
 import com.example.screenshotcleaner.worker.ScreenshotScanWorker
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
@@ -45,36 +49,44 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         app.notificationManager.createChannel()
-        scheduleScreenshotScan()
 
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     ScreenshotCleanerApp(
                         activity = this,
-                        repository = app.repository
+                        repository = app.repository,
+                        settingsRepository = app.settingsRepository,
+                        onReminderSchedulingChanged = ::setReminderScheduling
                     )
                 }
             }
         }
     }
 
-    private fun scheduleScreenshotScan() {
-        val request = PeriodicWorkRequestBuilder<ScreenshotScanWorker>(1, TimeUnit.DAYS)
-            .build()
+    private fun setReminderScheduling(enabled: Boolean) {
+        val workManager = WorkManager.getInstance(this)
+        if (enabled) {
+            val request = PeriodicWorkRequestBuilder<ScreenshotScanWorker>(1, TimeUnit.DAYS)
+                .build()
 
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            ScreenshotScanWorker.WORK_NAME,
-            ExistingPeriodicWorkPolicy.UPDATE,
-            request
-        )
+            workManager.enqueueUniquePeriodicWork(
+                ScreenshotScanWorker.WORK_NAME,
+                ExistingPeriodicWorkPolicy.UPDATE,
+                request
+            )
+        } else {
+            workManager.cancelUniqueWork(ScreenshotScanWorker.WORK_NAME)
+        }
     }
 }
 
 @Composable
 private fun ScreenshotCleanerApp(
     activity: ComponentActivity,
-    repository: ScreenshotRepository
+    repository: ScreenshotRepository,
+    settingsRepository: SettingsRepository,
+    onReminderSchedulingChanged: (Boolean) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
     var hasImagePermission by remember { mutableStateOf(activity.hasImagePermission()) }
@@ -82,6 +94,8 @@ private fun ScreenshotCleanerApp(
     var screenshots by remember { mutableStateOf<List<ScreenshotItem>>(emptyList()) }
     var pendingDelete by remember { mutableStateOf<ScreenshotItem?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var destination by remember { mutableStateOf(AppDestination.REVIEW) }
+    val settings by settingsRepository.settings.collectAsState(initial = AppSettings())
 
     fun refreshScreenshots() {
         coroutineScope.launch {
@@ -119,6 +133,10 @@ private fun ScreenshotCleanerApp(
         if (hasImagePermission) refreshScreenshots()
     }
 
+    LaunchedEffect(settings.remindersEnabled) {
+        onReminderSchedulingChanged(settings.remindersEnabled)
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         if (!hasImagePermission || !hasNotificationPermission) {
             OnboardingScreen(
@@ -136,27 +154,45 @@ private fun ScreenshotCleanerApp(
                 }
             )
         } else {
-            ReviewScreen(
-                screenshots = screenshots,
-                errorMessage = errorMessage,
-                onKeep = { item ->
-                    coroutineScope.launch {
-                        repository.keep(item)
-                        screenshots = screenshots.drop(1)
-                    }
-                },
-                onDelete = { item ->
-                    pendingDelete = item
-                    try {
-                        activity.requestDelete(item.uri, deleteLauncher::launch)
-                    } catch (exception: RuntimeException) {
-                        errorMessage = exception.message ?: "Delete request failed."
-                    }
-                },
-                onRefresh = { refreshScreenshots() }
-            )
+            when (destination) {
+                AppDestination.REVIEW -> ReviewScreen(
+                    screenshots = screenshots,
+                    errorMessage = errorMessage,
+                    onKeep = { item ->
+                        coroutineScope.launch {
+                            repository.keep(item)
+                            screenshots = screenshots.drop(1)
+                        }
+                    },
+                    onDelete = { item ->
+                        pendingDelete = item
+                        try {
+                            activity.requestDelete(item.uri, deleteLauncher::launch)
+                        } catch (exception: RuntimeException) {
+                            errorMessage = exception.message ?: "Delete request failed."
+                        }
+                    },
+                    onRefresh = { refreshScreenshots() },
+                    onOpenSettings = { destination = AppDestination.SETTINGS }
+                )
+
+                AppDestination.SETTINGS -> SettingsScreen(
+                    settings = settings,
+                    onRemindersEnabledChange = { enabled ->
+                        coroutineScope.launch {
+                            settingsRepository.setRemindersEnabled(enabled)
+                        }
+                    },
+                    onBack = { destination = AppDestination.REVIEW }
+                )
+            }
         }
     }
+}
+
+private enum class AppDestination {
+    REVIEW,
+    SETTINGS
 }
 
 private fun ComponentActivity.hasImagePermission(): Boolean {

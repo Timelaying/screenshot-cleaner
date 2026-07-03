@@ -4,9 +4,9 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -19,19 +19,27 @@ class SettingsRepositoryTest {
     @get:Rule
     val temporaryFolder = TemporaryFolder()
 
-    private val testScope = TestScope()
-
     @Test
-    fun remindersAreEnabledByDefault() = testScope.runTest {
-        val repository = SettingsRepository(testDataStore("default.preferences_pb"))
+    fun remindersAreEnabledByDefault() = runTest {
+        val repository = SettingsRepository(
+            testDataStore(
+                fileName = "default.preferences_pb",
+                scope = backgroundScope
+            )
+        )
 
         assertTrue(repository.settings.first().remindersEnabled)
         assertTrue(repository.remindersEnabled())
     }
 
     @Test
-    fun updatesReminderPreference() = testScope.runTest {
-        val repository = SettingsRepository(testDataStore("updated.preferences_pb"))
+    fun updatesReminderPreference() = runTest {
+        val repository = SettingsRepository(
+            testDataStore(
+                fileName = "updated.preferences_pb",
+                scope = backgroundScope
+            )
+        )
 
         repository.setRemindersEnabled(false)
 
@@ -39,9 +47,12 @@ class SettingsRepositoryTest {
         assertFalse(repository.remindersEnabled())
     }
 
-    private fun testDataStore(fileName: String): DataStore<Preferences> {
+    private fun testDataStore(
+        fileName: String,
+        scope: CoroutineScope
+    ): DataStore<Preferences> {
         return PreferenceDataStoreFactory.create(
-            scope = testScope,
+            scope = scope,
             produceFile = { File(temporaryFolder.root, fileName) }
         )
     }

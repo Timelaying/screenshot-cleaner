@@ -19,6 +19,10 @@ class ScreenshotScanWorker(
         }
 
         val app = applicationContext as ScreenshotCleanerApplication
+        if (!app.settingsRepository.remindersEnabled()) {
+            return Result.success()
+        }
+
         val screenshots = app.repository.getPendingOldScreenshots()
         if (screenshots.isNotEmpty()) {
             app.notificationManager.createChannel()
@@ -47,4 +51,3 @@ private fun Context.hasNotificationPermission(): Boolean {
     return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
         ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 }
-

@@ -5,6 +5,8 @@ import androidx.room.Room
 import com.example.screenshotcleaner.data.local.ScreenshotCleanerDatabase
 import com.example.screenshotcleaner.data.media.ScreenshotScanner
 import com.example.screenshotcleaner.data.repository.ScreenshotRepository
+import com.example.screenshotcleaner.data.settings.SettingsRepository
+import com.example.screenshotcleaner.data.settings.screenshotCleanerSettingsDataStore
 import com.example.screenshotcleaner.notification.ScreenshotNotificationManager
 
 class ScreenshotCleanerApplication : Application() {
@@ -26,5 +28,8 @@ class ScreenshotCleanerApplication : Application() {
     val notificationManager: ScreenshotNotificationManager by lazy {
         ScreenshotNotificationManager(applicationContext)
     }
-}
 
+    val settingsRepository: SettingsRepository by lazy {
+        SettingsRepository(applicationContext.screenshotCleanerSettingsDataStore)
+    }
+}

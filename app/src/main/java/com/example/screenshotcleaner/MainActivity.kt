@@ -123,7 +123,7 @@ private fun ScreenshotCleanerApp(
         val item = pendingDelete
         pendingDelete = null
         if (result.resultCode == Activity.RESULT_OK && item != null) {
-            markDeleted(item, repository) { updatedScreenshots ->
+            coroutineScope.markDeleted(item, repository) { updatedScreenshots ->
                 errorMessage = null
                 screenshots = updatedScreenshots
             }
@@ -172,7 +172,7 @@ private fun ScreenshotCleanerApp(
                             val deletedImmediately = activity.requestDelete(item.uri, deleteLauncher::launch)
                             if (deletedImmediately) {
                                 pendingDelete = null
-                                markDeleted(item, repository) { updatedScreenshots ->
+                                coroutineScope.markDeleted(item, repository) { updatedScreenshots ->
                                     errorMessage = null
                                     screenshots = updatedScreenshots
                                 }

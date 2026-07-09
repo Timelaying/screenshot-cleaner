@@ -99,6 +99,7 @@ private fun ScreenshotCleanerApp(
 
     fun refreshScreenshots() {
         coroutineScope.launch {
+            errorMessage = null
             screenshots = repository.getPendingOldScreenshots()
         }
     }
@@ -122,9 +123,9 @@ private fun ScreenshotCleanerApp(
         val item = pendingDelete
         pendingDelete = null
         if (result.resultCode == Activity.RESULT_OK && item != null) {
-            coroutineScope.launch {
-                repository.markDeleted(item)
-                screenshots = screenshots.drop(1)
+            markDeleted(item, repository) { updatedScreenshots ->
+                errorMessage = null
+                screenshots = updatedScreenshots
             }
         }
     }
@@ -160,6 +161,7 @@ private fun ScreenshotCleanerApp(
                     errorMessage = errorMessage,
                     onKeep = { item ->
                         coroutineScope.launch {
+                            errorMessage = null
                             repository.keep(item)
                             screenshots = screenshots.drop(1)
                         }
@@ -167,8 +169,16 @@ private fun ScreenshotCleanerApp(
                     onDelete = { item ->
                         pendingDelete = item
                         try {
-                            activity.requestDelete(item.uri, deleteLauncher::launch)
+                            val deletedImmediately = activity.requestDelete(item.uri, deleteLauncher::launch)
+                            if (deletedImmediately) {
+                                pendingDelete = null
+                                markDeleted(item, repository) { updatedScreenshots ->
+                                    errorMessage = null
+                                    screenshots = updatedScreenshots
+                                }
+                            }
                         } catch (exception: RuntimeException) {
+                            pendingDelete = null
                             errorMessage = exception.message ?: "Delete request failed."
                         }
                     },
@@ -187,6 +197,17 @@ private fun ScreenshotCleanerApp(
                 )
             }
         }
+    }
+}
+
+private fun kotlinx.coroutines.CoroutineScope.markDeleted(
+    item: ScreenshotItem,
+    repository: ScreenshotRepository,
+    updateScreenshots: (List<ScreenshotItem>) -> Unit
+) {
+    launch {
+        repository.markDeleted(item)
+        updateScreenshots(repository.getPendingOldScreenshots())
     }
 }
 
@@ -215,14 +236,16 @@ private fun ComponentActivity.imagePermission(): String {
 private fun ComponentActivity.requestDelete(
     uri: Uri,
     launch: (IntentSenderRequest) -> Unit
-) {
+): Boolean {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         val pendingIntent: PendingIntent = MediaStore.createDeleteRequest(contentResolver, listOf(uri))
         launch(IntentSenderRequest.Builder(pendingIntent.intentSender).build())
+        return false
     } else {
         val deletedRows = contentResolver.delete(uri, null, null)
         if (deletedRows == 0) {
             throw RuntimeException("Android did not delete this screenshot.")
         }
+        return true
     }
 }

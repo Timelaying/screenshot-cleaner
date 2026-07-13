@@ -89,7 +89,7 @@ private fun ScreenshotCleanerApp(
     onReminderSchedulingChanged: (Boolean) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
-    var hasImagePermission by remember { mutableStateOf(activity.hasImagePermission()) }
+    var imageAccess by remember { mutableStateOf(activity.imageAccessState()) }
     var hasNotificationPermission by remember { mutableStateOf(activity.hasNotificationPermission()) }
     var screenshots by remember { mutableStateOf<List<ScreenshotItem>>(emptyList()) }
     var pendingDelete by remember { mutableStateOf<ScreenshotItem?>(null) }
@@ -105,10 +105,10 @@ private fun ScreenshotCleanerApp(
     }
 
     val imagePermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        hasImagePermission = granted
-        if (granted) refreshScreenshots()
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        imageAccess = activity.imageAccessState()
+        if (imageAccess == ImageAccessState.FULL) refreshScreenshots()
     }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -130,8 +130,8 @@ private fun ScreenshotCleanerApp(
         }
     }
 
-    LaunchedEffect(hasImagePermission) {
-        if (hasImagePermission) refreshScreenshots()
+    LaunchedEffect(imageAccess) {
+        if (imageAccess == ImageAccessState.FULL) refreshScreenshots()
     }
 
     LaunchedEffect(settings.remindersEnabled) {
@@ -139,12 +139,13 @@ private fun ScreenshotCleanerApp(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (!hasImagePermission || !hasNotificationPermission) {
+        if (imageAccess != ImageAccessState.FULL || !hasNotificationPermission) {
             OnboardingScreen(
-                hasImagePermission = hasImagePermission,
+                hasImagePermission = imageAccess == ImageAccessState.FULL,
+                imagePermissionStatus = imageAccess.statusLabel,
                 hasNotificationPermission = hasNotificationPermission,
                 onGrantImagePermission = {
-                    imagePermissionLauncher.launch(activity.imagePermission())
+                    imagePermissionLauncher.launch(activity.imagePermissions())
                 },
                 onGrantNotificationPermission = {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -216,8 +217,26 @@ private enum class AppDestination {
     SETTINGS
 }
 
-private fun ComponentActivity.hasImagePermission(): Boolean {
-    return ContextCompat.checkSelfPermission(this, imagePermission()) == PackageManager.PERMISSION_GRANTED
+private enum class ImageAccessState(val statusLabel: String) {
+    FULL("Ready"),
+    PARTIAL("Full access required"),
+    MISSING("Required")
+}
+
+private fun ComponentActivity.imageAccessState(): ImageAccessState {
+    val hasFullAccess = ContextCompat.checkSelfPermission(
+        this,
+        imagePermission()
+    ) == PackageManager.PERMISSION_GRANTED
+    if (hasFullAccess) return ImageAccessState.FULL
+
+    val hasPartialAccess = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+        ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+        ) == PackageManager.PERMISSION_GRANTED
+
+    return if (hasPartialAccess) ImageAccessState.PARTIAL else ImageAccessState.MISSING
 }
 
 private fun ComponentActivity.hasNotificationPermission(): Boolean {
@@ -230,6 +249,17 @@ private fun ComponentActivity.imagePermission(): String {
         Manifest.permission.READ_MEDIA_IMAGES
     } else {
         Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+}
+
+private fun ComponentActivity.imagePermissions(): Array<String> {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        arrayOf(
+            Manifest.permission.READ_MEDIA_IMAGES,
+            Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+        )
+    } else {
+        arrayOf(imagePermission())
     }
 }
 

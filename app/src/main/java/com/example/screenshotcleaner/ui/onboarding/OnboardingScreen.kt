@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun OnboardingScreen(
     hasImagePermission: Boolean,
+    imagePermissionStatus: String,
     hasNotificationPermission: Boolean,
     onGrantImagePermission: () -> Unit,
     onGrantNotificationPermission: () -> Unit
@@ -44,6 +45,7 @@ fun OnboardingScreen(
         PermissionCard(
             title = "Photo access",
             isGranted = hasImagePermission,
+            status = imagePermissionStatus,
             actionLabel = "Grant access",
             onClick = onGrantImagePermission
         )
@@ -51,6 +53,7 @@ fun OnboardingScreen(
         PermissionCard(
             title = "Notifications",
             isGranted = hasNotificationPermission,
+            status = if (hasNotificationPermission) "Ready" else "Required",
             actionLabel = "Enable alerts",
             onClick = onGrantNotificationPermission
         )
@@ -61,6 +64,7 @@ fun OnboardingScreen(
 private fun PermissionCard(
     title: String,
     isGranted: Boolean,
+    status: String,
     actionLabel: String,
     onClick: () -> Unit
 ) {
@@ -78,7 +82,7 @@ private fun PermissionCard(
             Column {
                 Text(text = title, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    text = if (isGranted) "Ready" else "Required",
+                    text = status,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -90,4 +94,3 @@ private fun PermissionCard(
         }
     }
 }
-

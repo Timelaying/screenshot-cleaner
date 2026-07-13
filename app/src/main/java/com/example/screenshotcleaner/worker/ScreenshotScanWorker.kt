@@ -14,7 +14,7 @@ class ScreenshotScanWorker(
     params: WorkerParameters
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
-        if (!applicationContext.hasImagePermission() || !applicationContext.hasNotificationPermission()) {
+        if (!applicationContext.hasFullImageAccess() || !applicationContext.hasNotificationPermission()) {
             return Result.success()
         }
 
@@ -37,7 +37,7 @@ class ScreenshotScanWorker(
     }
 }
 
-private fun Context.hasImagePermission(): Boolean {
+private fun Context.hasFullImageAccess(): Boolean {
     val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         Manifest.permission.READ_MEDIA_IMAGES
     } else {

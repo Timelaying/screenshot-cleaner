@@ -60,7 +60,7 @@ class ScreenshotRepositoryTest {
     private fun screenshot(id: Long): ScreenshotItem {
         return ScreenshotItem(
             id = id,
-            uri = TestUri,
+            uri = Uri.EMPTY,
             displayName = "Screenshot_$id.png",
             dateAddedSeconds = id,
             dateModifiedSeconds = id
@@ -88,28 +88,4 @@ private class FakeScreenshotDecisionDao(
     override suspend fun upsertDecision(decision: ScreenshotDecisionEntity) {
         decisions[decision.mediaId] = decision
     }
-}
-
-private object TestUri : Uri() {
-    override fun isHierarchical(): Boolean = true
-    override fun isRelative(): Boolean = false
-    override fun getScheme(): String = "content"
-    override fun getSchemeSpecificPart(): String = "//screenshots/test"
-    override fun getEncodedSchemeSpecificPart(): String = "//screenshots/test"
-    override fun getAuthority(): String = "screenshots"
-    override fun getEncodedAuthority(): String = "screenshots"
-    override fun getUserInfo(): String? = null
-    override fun getEncodedUserInfo(): String? = null
-    override fun getHost(): String = "screenshots"
-    override fun getPort(): Int = -1
-    override fun getPath(): String = "/test"
-    override fun getEncodedPath(): String = "/test"
-    override fun getQuery(): String? = null
-    override fun getEncodedQuery(): String? = null
-    override fun getFragment(): String? = null
-    override fun getEncodedFragment(): String? = null
-    override fun getPathSegments(): List<String> = listOf("test")
-    override fun getLastPathSegment(): String = "test"
-    override fun buildUpon(): Builder = Builder()
-    override fun toString(): String = "content://screenshots/test"
 }

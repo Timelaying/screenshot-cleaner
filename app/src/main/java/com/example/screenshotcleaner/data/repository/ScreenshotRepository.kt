@@ -2,12 +2,12 @@ package com.example.screenshotcleaner.data.repository
 
 import com.example.screenshotcleaner.data.local.ScreenshotDecisionDao
 import com.example.screenshotcleaner.data.local.ScreenshotDecisionEntity
-import com.example.screenshotcleaner.data.media.ScreenshotScanner
+import com.example.screenshotcleaner.data.media.ScreenshotDataSource
 import com.example.screenshotcleaner.domain.ScreenshotDecision
 import com.example.screenshotcleaner.domain.ScreenshotItem
 
 class ScreenshotRepository(
-    private val scanner: ScreenshotScanner,
+    private val scanner: ScreenshotDataSource,
     private val decisionDao: ScreenshotDecisionDao
 ) {
     suspend fun getPendingOldScreenshots(ageDays: Long = 30): List<ScreenshotItem> {
@@ -37,4 +37,3 @@ class ScreenshotRepository(
         )
     }
 }
-

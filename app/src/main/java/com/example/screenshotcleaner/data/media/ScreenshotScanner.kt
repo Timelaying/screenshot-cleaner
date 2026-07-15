@@ -9,8 +9,8 @@ import java.time.temporal.ChronoUnit
 
 class ScreenshotScanner(
     private val context: Context
-) {
-    fun findOldScreenshots(ageDays: Long = 30): List<ScreenshotItem> {
+) : ScreenshotDataSource {
+    override fun findOldScreenshots(ageDays: Long): List<ScreenshotItem> {
         val cutoffSeconds = Instant.now()
             .minus(ageDays, ChronoUnit.DAYS)
             .epochSecond
@@ -63,4 +63,3 @@ class ScreenshotScanner(
         }.orEmpty()
     }
 }
-

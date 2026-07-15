@@ -9,7 +9,10 @@ import com.example.screenshotcleaner.domain.ScreenshotItem
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class ScreenshotRepositoryTest {
     @Test
     fun pendingScreenshotsExcludeKeptAndDeletedItems() = runTest {
@@ -60,7 +63,7 @@ class ScreenshotRepositoryTest {
     private fun screenshot(id: Long): ScreenshotItem {
         return ScreenshotItem(
             id = id,
-            uri = Uri.EMPTY,
+            uri = Uri.parse("content://screenshots/$id"),
             displayName = "Screenshot_$id.png",
             dateAddedSeconds = id,
             dateModifiedSeconds = id

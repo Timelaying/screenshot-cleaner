@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -35,6 +36,7 @@ import com.example.screenshotcleaner.data.repository.ScreenshotRepository
 import com.example.screenshotcleaner.data.settings.AppSettings
 import com.example.screenshotcleaner.data.settings.SettingsRepository
 import com.example.screenshotcleaner.domain.ScreenshotItem
+import com.example.screenshotcleaner.notification.ScreenshotNotificationManager
 import com.example.screenshotcleaner.ui.onboarding.OnboardingScreen
 import com.example.screenshotcleaner.ui.review.ReviewScreen
 import com.example.screenshotcleaner.ui.settings.SettingsScreen
@@ -43,11 +45,16 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    private var reviewIntentVersion by mutableIntStateOf(0)
+
     private val app: ScreenshotCleanerApplication
         get() = application as ScreenshotCleanerApplication
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (intent.isReviewScreenIntent()) {
+            reviewIntentVersion = 1
+        }
         app.notificationManager.createChannel()
 
         setContent {
@@ -57,10 +64,19 @@ class MainActivity : ComponentActivity() {
                         activity = this,
                         repository = app.repository,
                         settingsRepository = app.settingsRepository,
+                        reviewIntentVersion = reviewIntentVersion,
                         onReminderSchedulingChanged = ::setReminderScheduling
                     )
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.isReviewScreenIntent()) {
+            reviewIntentVersion++
         }
     }
 
@@ -86,6 +102,7 @@ private fun ScreenshotCleanerApp(
     activity: ComponentActivity,
     repository: ScreenshotRepository,
     settingsRepository: SettingsRepository,
+    reviewIntentVersion: Int,
     onReminderSchedulingChanged: (Boolean) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -132,6 +149,12 @@ private fun ScreenshotCleanerApp(
 
     LaunchedEffect(imageAccess) {
         if (imageAccess == ImageAccessState.FULL) refreshScreenshots()
+    }
+
+    LaunchedEffect(reviewIntentVersion) {
+        if (reviewIntentVersion > 0) {
+            destination = AppDestination.REVIEW
+        }
     }
 
     LaunchedEffect(settings.remindersEnabled) {
@@ -200,6 +223,9 @@ private fun ScreenshotCleanerApp(
         }
     }
 }
+
+internal fun Intent.isReviewScreenIntent(): Boolean =
+    action == ScreenshotNotificationManager.ACTION_REVIEW_SCREEN
 
 private fun kotlinx.coroutines.CoroutineScope.markDeleted(
     item: ScreenshotItem,

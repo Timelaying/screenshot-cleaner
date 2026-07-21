@@ -29,6 +29,7 @@ class ScreenshotNotificationManager(
     fun showOldScreenshotsFound(count: Int) {
         val intent = Intent(context, MainActivity::class.java)
             .setAction(ACTION_REVIEW_SCREEN)
+            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val pendingIntent = PendingIntent.getActivity(
             context,
             0,

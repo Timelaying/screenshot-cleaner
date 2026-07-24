@@ -46,6 +46,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var reviewIntentVersion by mutableIntStateOf(0)
+    private var permissionStateVersion by mutableIntStateOf(0)
 
     private val app: ScreenshotCleanerApplication
         get() = application as ScreenshotCleanerApplication
@@ -65,6 +66,7 @@ class MainActivity : ComponentActivity() {
                         repository = app.repository,
                         settingsRepository = app.settingsRepository,
                         reviewIntentVersion = reviewIntentVersion,
+                        permissionStateVersion = permissionStateVersion,
                         onReminderSchedulingChanged = ::setReminderScheduling
                     )
                 }
@@ -78,6 +80,11 @@ class MainActivity : ComponentActivity() {
         if (intent.isReviewScreenIntent()) {
             reviewIntentVersion++
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        permissionStateVersion++
     }
 
     private fun setReminderScheduling(enabled: Boolean) {
@@ -103,6 +110,7 @@ private fun ScreenshotCleanerApp(
     repository: ScreenshotRepository,
     settingsRepository: SettingsRepository,
     reviewIntentVersion: Int,
+    permissionStateVersion: Int,
     onReminderSchedulingChanged: (Boolean) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -157,12 +165,17 @@ private fun ScreenshotCleanerApp(
         }
     }
 
+    LaunchedEffect(permissionStateVersion) {
+        imageAccess = activity.imageAccessState()
+        hasNotificationPermission = activity.hasNotificationPermission()
+    }
+
     LaunchedEffect(settings.remindersEnabled) {
         onReminderSchedulingChanged(settings.remindersEnabled)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (imageAccess != ImageAccessState.FULL || !hasNotificationPermission) {
+        if (shouldShowOnboarding(imageAccess, hasNotificationPermission)) {
             OnboardingScreen(
                 hasImagePermission = imageAccess == ImageAccessState.FULL,
                 imagePermissionStatus = imageAccess.statusLabel,
@@ -243,11 +256,16 @@ private enum class AppDestination {
     SETTINGS
 }
 
-private enum class ImageAccessState(val statusLabel: String) {
+internal enum class ImageAccessState(val statusLabel: String) {
     FULL("Ready"),
     PARTIAL("Full access required"),
     MISSING("Required")
 }
+
+internal fun shouldShowOnboarding(
+    imageAccess: ImageAccessState,
+    hasNotificationPermission: Boolean
+): Boolean = imageAccess != ImageAccessState.FULL || !hasNotificationPermission
 
 private fun ComponentActivity.imageAccessState(): ImageAccessState {
     val hasFullAccess = ContextCompat.checkSelfPermission(

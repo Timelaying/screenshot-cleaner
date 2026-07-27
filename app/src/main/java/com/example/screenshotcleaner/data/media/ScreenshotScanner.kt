@@ -2,6 +2,7 @@ package com.example.screenshotcleaner.data.media
 
 import android.content.ContentUris
 import android.content.Context
+import android.os.Build
 import android.provider.MediaStore
 import com.example.screenshotcleaner.domain.ScreenshotItem
 import java.time.Instant
@@ -16,13 +17,15 @@ class ScreenshotScanner(
             .epochSecond
 
         val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        val projection = arrayOf(
-            MediaStore.Images.Media._ID,
-            MediaStore.Images.Media.DISPLAY_NAME,
-            MediaStore.Images.Media.DATE_ADDED,
-            MediaStore.Images.Media.DATE_MODIFIED,
-            MediaStore.Images.Media.RELATIVE_PATH
-        )
+        val projection = buildList {
+            add(MediaStore.Images.Media._ID)
+            add(MediaStore.Images.Media.DISPLAY_NAME)
+            add(MediaStore.Images.Media.DATE_ADDED)
+            add(MediaStore.Images.Media.DATE_MODIFIED)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                add(MediaStore.Images.Media.RELATIVE_PATH)
+            }
+        }.toTypedArray()
 
         val selection = "${MediaStore.Images.Media.DATE_ADDED} <= ?"
         val selectionArgs = arrayOf(cutoffSeconds.toString())
@@ -39,13 +42,13 @@ class ScreenshotScanner(
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
             val addedColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
             val modifiedColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_MODIFIED)
-            val pathColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)
+            val pathColumn = cursor.getColumnIndex(MediaStore.Images.Media.RELATIVE_PATH)
 
             buildList {
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(idColumn)
                     val displayName = cursor.getString(nameColumn).orEmpty()
-                    val relativePath = cursor.getString(pathColumn)
+                    val relativePath = pathColumn.takeIf { it >= 0 }?.let(cursor::getString)
 
                     if (ScreenshotNameMatcher.looksLikeScreenshot(displayName, relativePath)) {
                         add(

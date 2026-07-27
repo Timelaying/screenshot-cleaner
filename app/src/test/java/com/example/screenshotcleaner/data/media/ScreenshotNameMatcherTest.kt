@@ -34,5 +34,14 @@ class ScreenshotNameMatcherTest {
             )
         )
     }
-}
 
+    @Test
+    fun matchesScreenshotFileNameWhenFolderMetadataIsUnavailable() {
+        assertTrue(
+            ScreenshotNameMatcher.looksLikeScreenshot(
+                displayName = "Screenshot_20260702-114200.png",
+                relativePath = null
+            )
+        )
+    }
+}

@@ -5,14 +5,16 @@ import android.content.Context
 import android.os.Build
 import android.provider.MediaStore
 import com.example.screenshotcleaner.domain.ScreenshotItem
+import java.time.Clock
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 class ScreenshotScanner(
-    private val context: Context
+    private val context: Context,
+    private val clock: Clock = Clock.systemUTC()
 ) : ScreenshotDataSource {
     override fun findOldScreenshots(ageDays: Long): List<ScreenshotItem> {
-        val cutoffSeconds = Instant.now()
+        val cutoffSeconds = Instant.now(clock)
             .minus(ageDays, ChronoUnit.DAYS)
             .epochSecond
 

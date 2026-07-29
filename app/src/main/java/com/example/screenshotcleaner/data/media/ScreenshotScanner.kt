@@ -14,20 +14,10 @@ class ScreenshotScanner(
     private val clock: Clock = Clock.systemUTC()
 ) : ScreenshotDataSource {
     override fun findOldScreenshots(ageDays: Long): List<ScreenshotItem> {
-        val cutoffSeconds = Instant.now(clock)
-            .minus(ageDays, ChronoUnit.DAYS)
-            .epochSecond
+        val cutoffSeconds = screenshotCutoffSeconds(Instant.now(clock), ageDays)
 
         val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        val projection = buildList {
-            add(MediaStore.Images.Media._ID)
-            add(MediaStore.Images.Media.DISPLAY_NAME)
-            add(MediaStore.Images.Media.DATE_ADDED)
-            add(MediaStore.Images.Media.DATE_MODIFIED)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                add(MediaStore.Images.Media.RELATIVE_PATH)
-            }
-        }.toTypedArray()
+        val projection = screenshotProjection(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
 
         val selection = "${MediaStore.Images.Media.DATE_ADDED} <= ?"
         val selectionArgs = arrayOf(cutoffSeconds.toString())
@@ -67,4 +57,20 @@ class ScreenshotScanner(
             }
         }.orEmpty()
     }
+}
+
+internal fun screenshotCutoffSeconds(now: Instant, ageDays: Long): Long {
+    return now.minus(ageDays, ChronoUnit.DAYS).epochSecond
+}
+
+internal fun screenshotProjection(includeRelativePath: Boolean): Array<String> {
+    return buildList {
+        add(MediaStore.Images.Media._ID)
+        add(MediaStore.Images.Media.DISPLAY_NAME)
+        add(MediaStore.Images.Media.DATE_ADDED)
+        add(MediaStore.Images.Media.DATE_MODIFIED)
+        if (includeRelativePath) {
+            add(MediaStore.Images.Media.RELATIVE_PATH)
+        }
+    }.toTypedArray()
 }

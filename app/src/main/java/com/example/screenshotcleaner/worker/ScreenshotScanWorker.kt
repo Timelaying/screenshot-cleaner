@@ -14,12 +14,13 @@ class ScreenshotScanWorker(
     params: WorkerParameters
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
-        if (!applicationContext.hasFullImageAccess() || !applicationContext.hasNotificationPermission()) {
-            return Result.success()
-        }
-
         val app = applicationContext as ScreenshotCleanerApplication
-        if (!app.settingsRepository.remindersEnabled()) {
+        if (!shouldRunScreenshotScan(
+                hasFullImageAccess = applicationContext.hasFullImageAccess(),
+                hasNotificationPermission = applicationContext.hasNotificationPermission(),
+                remindersEnabled = app.settingsRepository.remindersEnabled()
+            )
+        ) {
             return Result.success()
         }
 
@@ -36,6 +37,12 @@ class ScreenshotScanWorker(
         const val WORK_NAME = "old-screenshot-scan"
     }
 }
+
+internal fun shouldRunScreenshotScan(
+    hasFullImageAccess: Boolean,
+    hasNotificationPermission: Boolean,
+    remindersEnabled: Boolean
+): Boolean = hasFullImageAccess && hasNotificationPermission && remindersEnabled
 
 private fun Context.hasFullImageAccess(): Boolean {
     val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

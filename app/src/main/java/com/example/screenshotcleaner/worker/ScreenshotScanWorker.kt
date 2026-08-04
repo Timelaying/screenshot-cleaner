@@ -25,7 +25,7 @@ class ScreenshotScanWorker(
         }
 
         val screenshots = app.repository.getPendingOldScreenshots()
-        if (screenshots.isNotEmpty()) {
+        if (shouldNotifyForOldScreenshots(screenshots.size)) {
             app.notificationManager.createChannel()
             app.notificationManager.showOldScreenshotsFound(screenshots.size)
         }
@@ -43,6 +43,8 @@ internal fun shouldRunScreenshotScan(
     hasNotificationPermission: Boolean,
     remindersEnabled: Boolean
 ): Boolean = hasFullImageAccess && hasNotificationPermission && remindersEnabled
+
+internal fun shouldNotifyForOldScreenshots(count: Int): Boolean = count > 0
 
 private fun Context.hasFullImageAccess(): Boolean {
     val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

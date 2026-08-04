@@ -268,11 +268,18 @@ internal fun shouldShowOnboarding(
 ): Boolean = imageAccess != ImageAccessState.FULL || !hasNotificationPermission
 
 private fun ComponentActivity.imageAccessState(): ImageAccessState {
-    val hasFullAccess = ContextCompat.checkSelfPermission(
+    val hasReadAccess = ContextCompat.checkSelfPermission(
         this,
         imagePermission()
     ) == PackageManager.PERMISSION_GRANTED
-    if (hasFullAccess) return ImageAccessState.FULL
+    val hasWriteAccess = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ||
+        ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) == PackageManager.PERMISSION_GRANTED
+    if (hasRequiredMediaAccess(hasReadAccess, hasWriteAccess, Build.VERSION.SDK_INT)) {
+        return ImageAccessState.FULL
+    }
 
     val hasPartialAccess = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
         ContextCompat.checkSelfPermission(
@@ -297,15 +304,24 @@ private fun ComponentActivity.imagePermission(): String {
 }
 
 private fun ComponentActivity.imagePermissions(): Array<String> {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-        arrayOf(
-            Manifest.permission.READ_MEDIA_IMAGES,
-            Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
-        )
-    } else {
-        arrayOf(imagePermission())
-    }
+    return buildList {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            add(Manifest.permission.READ_MEDIA_IMAGES)
+            add(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+        } else {
+            add(imagePermission())
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
+    }.toTypedArray()
 }
+
+internal fun hasRequiredMediaAccess(
+    hasReadAccess: Boolean,
+    hasWriteAccess: Boolean,
+    sdkInt: Int
+): Boolean = hasReadAccess && (sdkInt >= Build.VERSION_CODES.R || hasWriteAccess)
 
 private fun ComponentActivity.requestDelete(
     uri: Uri,

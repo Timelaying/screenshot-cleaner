@@ -6,6 +6,16 @@ import org.junit.Test
 
 class ScreenshotScanWorkerTest {
     @Test
+    fun notificationIsShownWhenOldScreenshotsExist() {
+        assertTrue(shouldNotifyForOldScreenshots(count = 1))
+    }
+
+    @Test
+    fun notificationIsSkippedWhenNoOldScreenshotsExist() {
+        assertFalse(shouldNotifyForOldScreenshots(count = 0))
+    }
+
+    @Test
     fun scanRunsOnlyWhenAllPrerequisitesAreAvailable() {
         assertTrue(
             shouldRunScreenshotScan(

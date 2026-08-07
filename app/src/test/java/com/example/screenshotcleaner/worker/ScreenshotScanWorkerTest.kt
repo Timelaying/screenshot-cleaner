@@ -1,5 +1,7 @@
 package com.example.screenshotcleaner.worker
 
+import android.os.Build
+import com.example.screenshotcleaner.hasRequiredMediaAccess
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -57,5 +59,16 @@ class ScreenshotScanWorkerTest {
                 remindersEnabled = false
             )
         )
+    }
+
+    @Test
+    fun legacyScanRequiresWriteAccessAlongsideReadAccess() {
+        assertTrue(hasRequiredMediaAccess(hasReadAccess = true, hasWriteAccess = true, sdkInt = 29))
+        assertFalse(hasRequiredMediaAccess(hasReadAccess = true, hasWriteAccess = false, sdkInt = 29))
+    }
+
+    @Test
+    fun modernScanDoesNotRequireLegacyWriteAccess() {
+        assertTrue(hasRequiredMediaAccess(hasReadAccess = true, hasWriteAccess = false, sdkInt = Build.VERSION_CODES.R))
     }
 }

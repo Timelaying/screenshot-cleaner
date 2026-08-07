@@ -8,6 +8,7 @@ import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.screenshotcleaner.ScreenshotCleanerApplication
+import com.example.screenshotcleaner.hasRequiredMediaAccess
 
 class ScreenshotScanWorker(
     appContext: Context,
@@ -47,13 +48,19 @@ internal fun shouldRunScreenshotScan(
 internal fun shouldNotifyForOldScreenshots(count: Int): Boolean = count > 0
 
 private fun Context.hasFullImageAccess(): Boolean {
-    val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    val readPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         Manifest.permission.READ_MEDIA_IMAGES
     } else {
         Manifest.permission.READ_EXTERNAL_STORAGE
     }
+    val hasReadAccess = ContextCompat.checkSelfPermission(this, readPermission) == PackageManager.PERMISSION_GRANTED
+    val hasWriteAccess = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ||
+        ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) == PackageManager.PERMISSION_GRANTED
 
-    return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+    return hasRequiredMediaAccess(hasReadAccess, hasWriteAccess, Build.VERSION.SDK_INT)
 }
 
 private fun Context.hasNotificationPermission(): Boolean {

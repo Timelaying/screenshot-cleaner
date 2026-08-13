@@ -147,9 +147,10 @@ private fun ScreenshotCard(
             .pointerInput(item.id) {
                 detectDragGestures(
                     onDragEnd = {
-                        when {
-                            dragAmount > 180f -> onKeep()
-                            dragAmount < -180f -> onDelete()
+                        when (reviewDecisionForDrag(dragAmount)) {
+                            ReviewSwipeDecision.KEEP -> onKeep()
+                            ReviewSwipeDecision.DELETE -> onDelete()
+                            ReviewSwipeDecision.NONE -> Unit
                         }
                         dragAmount = 0f
                     },
@@ -161,4 +162,19 @@ private fun ScreenshotCard(
                 )
             }
     )
+}
+
+internal enum class ReviewSwipeDecision {
+    KEEP,
+    DELETE,
+    NONE
+}
+
+internal fun reviewDecisionForDrag(
+    dragAmount: Float,
+    threshold: Float = 180f
+): ReviewSwipeDecision = when {
+    dragAmount > threshold -> ReviewSwipeDecision.KEEP
+    dragAmount < -threshold -> ReviewSwipeDecision.DELETE
+    else -> ReviewSwipeDecision.NONE
 }

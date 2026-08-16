@@ -1,5 +1,6 @@
 package com.example.screenshotcleaner
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -23,5 +24,16 @@ class MainActivityPermissionTest {
     fun AndroidElevenAndNewerCanUseUserMediatedDeleteWithReadAccess() {
         assertTrue(hasRequiredMediaAccess(hasReadAccess = true, hasWriteAccess = false, sdkInt = 30))
         assertFalse(hasRequiredMediaAccess(hasReadAccess = false, hasWriteAccess = true, sdkInt = 30))
+    }
+
+    @Test
+    fun preAndroidElevenUsesDirectDelete() {
+        assertEquals(DeleteMode.DIRECT, deleteModeForSdk(sdkInt = 29))
+    }
+
+    @Test
+    fun AndroidElevenAndNewerUsesUserMediatedDelete() {
+        assertEquals(DeleteMode.USER_CONFIRMATION, deleteModeForSdk(sdkInt = 30))
+        assertEquals(DeleteMode.USER_CONFIRMATION, deleteModeForSdk(sdkInt = 35))
     }
 }

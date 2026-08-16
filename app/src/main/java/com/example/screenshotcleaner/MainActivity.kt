@@ -2,7 +2,6 @@ package com.example.screenshotcleaner
 
 import android.Manifest
 import android.app.Activity
-import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -327,15 +326,31 @@ private fun ComponentActivity.requestDelete(
     uri: Uri,
     launch: (IntentSenderRequest) -> Unit
 ): Boolean {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        val pendingIntent: PendingIntent = MediaStore.createDeleteRequest(contentResolver, listOf(uri))
-        launch(IntentSenderRequest.Builder(pendingIntent.intentSender).build())
-        return false
-    } else {
-        val deletedRows = contentResolver.delete(uri, null, null)
-        if (deletedRows == 0) {
-            throw RuntimeException("Android did not delete this screenshot.")
+    return when (deleteModeForSdk(Build.VERSION.SDK_INT)) {
+        DeleteMode.USER_CONFIRMATION -> {
+            val pendingIntent = MediaStore.createDeleteRequest(contentResolver, listOf(uri))
+            launch(IntentSenderRequest.Builder(pendingIntent.intentSender).build())
+            false
         }
-        return true
+
+        DeleteMode.DIRECT -> {
+            val deletedRows = contentResolver.delete(uri, null, null)
+            if (deletedRows == 0) {
+                throw RuntimeException("Android did not delete this screenshot.")
+            }
+            true
+        }
     }
 }
+
+internal enum class DeleteMode {
+    USER_CONFIRMATION,
+    DIRECT
+}
+
+internal fun deleteModeForSdk(sdkInt: Int): DeleteMode =
+    if (sdkInt >= Build.VERSION_CODES.R) {
+        DeleteMode.USER_CONFIRMATION
+    } else {
+        DeleteMode.DIRECT
+    }

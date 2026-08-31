@@ -23,6 +23,7 @@ fun OnboardingScreen(
     hasImagePermission: Boolean,
     imagePermissionStatus: String,
     hasNotificationPermission: Boolean,
+    screenshotAgeDays: Long,
     onGrantImagePermission: () -> Unit,
     onGrantNotificationPermission: () -> Unit
 ) {
@@ -38,7 +39,7 @@ fun OnboardingScreen(
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = "Review screenshots older than 30 days and quickly decide what to keep or delete.",
+            text = "Review screenshots older than $screenshotAgeDays days and quickly decide what to keep or delete.",
             style = MaterialTheme.typography.bodyLarge
         )
         Spacer(modifier = Modifier.height(24.dp))

@@ -25,10 +25,11 @@ class ScreenshotScanWorker(
             return Result.success()
         }
 
-        val screenshots = app.repository.getPendingOldScreenshots()
+        val ageDays = app.settingsRepository.screenshotAgeDays()
+        val screenshots = app.repository.getPendingOldScreenshots(ageDays)
         if (shouldNotifyForOldScreenshots(screenshots.size)) {
             app.notificationManager.createChannel()
-            app.notificationManager.showOldScreenshotsFound(screenshots.size)
+            app.notificationManager.showOldScreenshotsFound(screenshots.size, ageDays)
         }
 
         return Result.success()

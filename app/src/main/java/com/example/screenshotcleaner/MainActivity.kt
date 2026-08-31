@@ -124,7 +124,7 @@ private fun ScreenshotCleanerApp(
     fun refreshScreenshots() {
         coroutineScope.launch {
             errorMessage = null
-            screenshots = repository.getPendingOldScreenshots()
+            screenshots = repository.getPendingOldScreenshots(settings.screenshotAgeDays)
         }
     }
 
@@ -147,14 +147,18 @@ private fun ScreenshotCleanerApp(
         val item = pendingDelete
         pendingDelete = null
         if (result.resultCode == Activity.RESULT_OK && item != null) {
-            coroutineScope.markDeleted(item, repository) { updatedScreenshots ->
+            coroutineScope.markDeleted(
+                item,
+                repository,
+                settings.screenshotAgeDays
+            ) { updatedScreenshots ->
                 errorMessage = null
                 screenshots = updatedScreenshots
             }
         }
     }
 
-    LaunchedEffect(imageAccess) {
+    LaunchedEffect(imageAccess, settings.screenshotAgeDays) {
         if (imageAccess == ImageAccessState.FULL) refreshScreenshots()
     }
 
@@ -179,6 +183,7 @@ private fun ScreenshotCleanerApp(
                 hasImagePermission = imageAccess == ImageAccessState.FULL,
                 imagePermissionStatus = imageAccess.statusLabel,
                 hasNotificationPermission = hasNotificationPermission,
+                screenshotAgeDays = settings.screenshotAgeDays,
                 onGrantImagePermission = {
                     imagePermissionLauncher.launch(activity.imagePermissions())
                 },
@@ -208,7 +213,11 @@ private fun ScreenshotCleanerApp(
                             val deletedImmediately = activity.requestDelete(item.uri, deleteLauncher::launch)
                             if (deletedImmediately) {
                                 pendingDelete = null
-                                coroutineScope.markDeleted(item, repository) { updatedScreenshots ->
+                                coroutineScope.markDeleted(
+                                    item,
+                                    repository,
+                                    settings.screenshotAgeDays
+                                ) { updatedScreenshots ->
                                     errorMessage = null
                                     screenshots = updatedScreenshots
                                 }
@@ -229,6 +238,11 @@ private fun ScreenshotCleanerApp(
                             settingsRepository.setRemindersEnabled(enabled)
                         }
                     },
+                    onScreenshotAgeDaysChange = { ageDays ->
+                        coroutineScope.launch {
+                            settingsRepository.setScreenshotAgeDays(ageDays)
+                        }
+                    },
                     onBack = { destination = AppDestination.REVIEW }
                 )
             }
@@ -242,11 +256,12 @@ internal fun Intent.isReviewScreenIntent(): Boolean =
 private fun kotlinx.coroutines.CoroutineScope.markDeleted(
     item: ScreenshotItem,
     repository: ScreenshotRepository,
+    ageDays: Long,
     updateScreenshots: (List<ScreenshotItem>) -> Unit
 ) {
     launch {
         repository.markDeleted(item)
-        updateScreenshots(repository.getPendingOldScreenshots())
+        updateScreenshots(repository.getPendingOldScreenshots(ageDays))
     }
 }
 

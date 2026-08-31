@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -19,7 +20,8 @@ class SettingsRepository(
 ) {
     val settings: Flow<AppSettings> = dataStore.data.map { preferences ->
         AppSettings(
-            remindersEnabled = preferences[REMINDERS_ENABLED] ?: true
+            remindersEnabled = preferences[REMINDERS_ENABLED] ?: true,
+            screenshotAgeDays = preferences[SCREENSHOT_AGE_DAYS] ?: DEFAULT_SCREENSHOT_AGE_DAYS
         )
     }
 
@@ -33,7 +35,21 @@ class SettingsRepository(
         return settings.first().remindersEnabled
     }
 
+    suspend fun setScreenshotAgeDays(ageDays: Long) {
+        require(ageDays in SUPPORTED_SCREENSHOT_AGE_DAYS) {
+            "Unsupported screenshot age threshold: $ageDays"
+        }
+        dataStore.edit { preferences ->
+            preferences[SCREENSHOT_AGE_DAYS] = ageDays
+        }
+    }
+
+    suspend fun screenshotAgeDays(): Long {
+        return settings.first().screenshotAgeDays
+    }
+
     private companion object {
         val REMINDERS_ENABLED = booleanPreferencesKey("reminders_enabled")
+        val SCREENSHOT_AGE_DAYS = longPreferencesKey("screenshot_age_days")
     }
 }

@@ -26,7 +26,7 @@ class ScreenshotNotificationManager(
         }
     }
 
-    fun showOldScreenshotsFound(count: Int) {
+    fun showOldScreenshotsFound(count: Int, ageDays: Long) {
         val intent = reviewIntent(context)
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -38,7 +38,7 @@ class ScreenshotNotificationManager(
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher)
             .setContentTitle("$count old screenshots found")
-            .setContentText("Review screenshots older than 30 days.")
+            .setContentText("Review screenshots older than $ageDays days.")
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()

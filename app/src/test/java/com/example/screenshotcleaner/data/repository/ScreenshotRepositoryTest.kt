@@ -60,6 +60,16 @@ class ScreenshotRepositoryTest {
         assertEquals(ScreenshotDecision.DELETED, dao.decisions.getValue(7).decision)
     }
 
+    @Test
+    fun forwardsConfiguredAgeThresholdToScanner() = runTest {
+        val scanner = RecordingScreenshotDataSource()
+        val repository = ScreenshotRepository(scanner, FakeScreenshotDecisionDao())
+
+        repository.getPendingOldScreenshots(ageDays = 90L)
+
+        assertEquals(90L, scanner.requestedAgeDays)
+    }
+
     private fun screenshot(id: Long): ScreenshotItem {
         return ScreenshotItem(
             id = id,
@@ -75,6 +85,15 @@ private class FakeScreenshotDataSource(
     private val screenshots: List<ScreenshotItem>
 ) : ScreenshotDataSource {
     override fun findOldScreenshots(ageDays: Long): List<ScreenshotItem> = screenshots
+}
+
+private class RecordingScreenshotDataSource : ScreenshotDataSource {
+    var requestedAgeDays: Long? = null
+
+    override fun findOldScreenshots(ageDays: Long): List<ScreenshotItem> {
+        requestedAgeDays = ageDays
+        return emptyList()
+    }
 }
 
 private class FakeScreenshotDecisionDao(

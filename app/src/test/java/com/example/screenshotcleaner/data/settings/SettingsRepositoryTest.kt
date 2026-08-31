@@ -9,6 +9,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -30,6 +31,7 @@ class SettingsRepositoryTest {
 
         assertTrue(repository.settings.first().remindersEnabled)
         assertTrue(repository.remindersEnabled())
+        assertEquals(DEFAULT_SCREENSHOT_AGE_DAYS, repository.screenshotAgeDays())
     }
 
     @Test
@@ -45,6 +47,40 @@ class SettingsRepositoryTest {
 
         assertFalse(repository.settings.first().remindersEnabled)
         assertFalse(repository.remindersEnabled())
+    }
+
+    @Test
+    fun updatesScreenshotAgeThreshold() = runTest {
+        val repository = SettingsRepository(
+            testDataStore(
+                fileName = "threshold.preferences_pb",
+                scope = backgroundScope
+            )
+        )
+
+        repository.setScreenshotAgeDays(90L)
+
+        assertEquals(90L, repository.settings.first().screenshotAgeDays)
+        assertEquals(90L, repository.screenshotAgeDays())
+    }
+
+    @Test
+    fun rejectsUnsupportedScreenshotAgeThreshold() = runTest {
+        val repository = SettingsRepository(
+            testDataStore(
+                fileName = "invalid-threshold.preferences_pb",
+                scope = backgroundScope
+            )
+        )
+
+        var rejected = false
+        try {
+            repository.setScreenshotAgeDays(45L)
+        } catch (_: IllegalArgumentException) {
+            rejected = true
+        }
+
+        assertTrue(rejected)
     }
 
     private fun testDataStore(

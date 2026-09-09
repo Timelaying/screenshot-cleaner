@@ -11,6 +11,17 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class ScreenshotNotificationManagerTest {
     @Test
+    fun notificationCopyUsesConfiguredScreenshotAge() {
+        assertEquals(
+            ScreenshotNotificationContent(
+                title = "3 old screenshots found",
+                text = "Review screenshots older than 90 days."
+            ),
+            screenshotNotificationContent(count = 3, ageDays = 90L)
+        )
+    }
+
+    @Test
     fun reviewIntentTargetsMainActivityWithReuseFlags() {
         val context = RuntimeEnvironment.getApplication()
 

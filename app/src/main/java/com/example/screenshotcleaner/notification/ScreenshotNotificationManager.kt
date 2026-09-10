@@ -34,11 +34,12 @@ class ScreenshotNotificationManager(
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val content = screenshotNotificationContent(count, ageDays)
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher)
-            .setContentTitle("$count old screenshots found")
-            .setContentText("Review screenshots older than $ageDays days.")
+            .setContentTitle(content.title)
+            .setContentText(content.text)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
@@ -52,6 +53,19 @@ class ScreenshotNotificationManager(
         private const val OLD_SCREENSHOTS_NOTIFICATION_ID = 1001
     }
 }
+
+internal data class ScreenshotNotificationContent(
+    val title: String,
+    val text: String
+)
+
+internal fun screenshotNotificationContent(
+    count: Int,
+    ageDays: Long
+): ScreenshotNotificationContent = ScreenshotNotificationContent(
+    title = "$count old screenshots found",
+    text = "Review screenshots older than $ageDays days."
+)
 
 internal fun reviewIntent(context: Context): Intent {
     return Intent(context, MainActivity::class.java)

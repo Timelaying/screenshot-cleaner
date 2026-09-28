@@ -17,9 +17,10 @@ class ScreenshotScanner(
         val cutoffSeconds = screenshotCutoffSeconds(Instant.now(clock), ageDays)
 
         val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        val projection = screenshotProjection(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+        val sdkInt = Build.VERSION.SDK_INT
+        val projection = screenshotProjection(sdkInt >= Build.VERSION_CODES.Q)
 
-        val selection = "${MediaStore.Images.Media.DATE_ADDED} <= ?"
+        val selection = screenshotSelection(sdkInt)
         val selectionArgs = arrayOf(cutoffSeconds.toString())
         val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} ASC"
 
@@ -61,6 +62,18 @@ class ScreenshotScanner(
 
 internal fun screenshotCutoffSeconds(now: Instant, ageDays: Long): Long {
     return now.minus(ageDays, ChronoUnit.DAYS).epochSecond
+}
+
+internal fun screenshotSelection(sdkInt: Int): String {
+    return buildList {
+        add("${MediaStore.Images.Media.DATE_ADDED} <= ?")
+        if (sdkInt >= Build.VERSION_CODES.Q) {
+            add("${MediaStore.MediaColumns.IS_PENDING} = 0")
+        }
+        if (sdkInt >= Build.VERSION_CODES.R) {
+            add("${MediaStore.MediaColumns.IS_TRASHED} = 0")
+        }
+    }.joinToString(separator = " AND ")
 }
 
 internal fun screenshotProjection(includeRelativePath: Boolean): Array<String> {

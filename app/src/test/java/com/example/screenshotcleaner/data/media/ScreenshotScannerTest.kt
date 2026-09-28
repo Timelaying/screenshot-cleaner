@@ -28,4 +28,30 @@ class ScreenshotScannerTest {
 
         assertTrue(projection.contains(MediaStore.Images.Media.RELATIVE_PATH))
     }
+
+    @Test
+    fun preAndroidTenSelectionOnlyUsesAgeCutoff() {
+        val selection = screenshotSelection(sdkInt = 28)
+
+        assertEquals(
+            "${MediaStore.Images.Media.DATE_ADDED} <= ?",
+            selection
+        )
+    }
+
+    @Test
+    fun AndroidTenSelectionExcludesPendingMedia() {
+        val selection = screenshotSelection(sdkInt = 29)
+
+        assertTrue(selection.contains("${MediaStore.MediaColumns.IS_PENDING} = 0"))
+        assertFalse(selection.contains(MediaStore.MediaColumns.IS_TRASHED))
+    }
+
+    @Test
+    fun AndroidElevenSelectionExcludesPendingAndTrashedMedia() {
+        val selection = screenshotSelection(sdkInt = 30)
+
+        assertTrue(selection.contains("${MediaStore.MediaColumns.IS_PENDING} = 0"))
+        assertTrue(selection.contains("${MediaStore.MediaColumns.IS_TRASHED} = 0"))
+    }
 }

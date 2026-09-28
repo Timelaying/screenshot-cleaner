@@ -1,13 +1,16 @@
 package com.example.screenshotcleaner.notification
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.example.screenshotcleaner.MainActivity
 import com.example.screenshotcleaner.R
 
@@ -44,7 +47,14 @@ class ScreenshotNotificationManager(
             .setAutoCancel(true)
             .build()
 
-        NotificationManagerCompat.from(context).notify(OLD_SCREENSHOTS_NOTIFICATION_ID, notification)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            NotificationManagerCompat.from(context).notify(OLD_SCREENSHOTS_NOTIFICATION_ID, notification)
+        }
     }
 
     companion object {
@@ -63,7 +73,7 @@ internal fun screenshotNotificationContent(
     count: Int,
     ageDays: Long
 ): ScreenshotNotificationContent = ScreenshotNotificationContent(
-    title = "$count old screenshots found",
+    title = if (count == 1) "1 old screenshot found" else "$count old screenshots found",
     text = "Review screenshots older than $ageDays days."
 )
 

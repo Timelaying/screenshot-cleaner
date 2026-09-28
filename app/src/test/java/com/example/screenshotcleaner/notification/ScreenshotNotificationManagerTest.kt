@@ -11,6 +11,26 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class ScreenshotNotificationManagerTest {
     @Test
+    fun notificationPostingRequiresPermissionOnAndroidThirteenAndNewer() {
+        assertEquals(
+            false,
+            shouldPostNotifications(sdkInt = 33, hasNotificationPermission = false)
+        )
+        assertEquals(
+            true,
+            shouldPostNotifications(sdkInt = 33, hasNotificationPermission = true)
+        )
+    }
+
+    @Test
+    fun notificationPostingDoesNotRequireRuntimePermissionOnOlderAndroid() {
+        assertEquals(
+            true,
+            shouldPostNotifications(sdkInt = 32, hasNotificationPermission = false)
+        )
+    }
+
+    @Test
     fun notificationCopyUsesSingularScreenshotLabelForOneResult() {
         assertEquals(
             ScreenshotNotificationContent(

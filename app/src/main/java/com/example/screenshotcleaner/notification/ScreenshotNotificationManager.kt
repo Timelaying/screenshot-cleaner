@@ -5,8 +5,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
-import android.content.pm.PackageManager
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -30,6 +30,17 @@ class ScreenshotNotificationManager(
     }
 
     fun showOldScreenshotsFound(count: Int, ageDays: Long) {
+        if (!shouldPostNotifications(
+                sdkInt = Build.VERSION.SDK_INT,
+                hasNotificationPermission = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            )
+        ) {
+            return
+        }
+
         val intent = reviewIntent(context)
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -47,14 +58,7 @@ class ScreenshotNotificationManager(
             .setAutoCancel(true)
             .build()
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            NotificationManagerCompat.from(context).notify(OLD_SCREENSHOTS_NOTIFICATION_ID, notification)
-        }
+        NotificationManagerCompat.from(context).notify(OLD_SCREENSHOTS_NOTIFICATION_ID, notification)
     }
 
     companion object {
@@ -76,6 +80,11 @@ internal fun screenshotNotificationContent(
     title = if (count == 1) "1 old screenshot found" else "$count old screenshots found",
     text = "Review screenshots older than $ageDays days."
 )
+
+internal fun shouldPostNotifications(
+    sdkInt: Int,
+    hasNotificationPermission: Boolean
+): Boolean = sdkInt < Build.VERSION_CODES.TIRAMISU || hasNotificationPermission
 
 internal fun reviewIntent(context: Context): Intent {
     return Intent(context, MainActivity::class.java)

@@ -36,4 +36,16 @@ class MainActivityPermissionTest {
         assertEquals(DeleteMode.USER_CONFIRMATION, deleteModeForSdk(sdkInt = 30))
         assertEquals(DeleteMode.USER_CONFIRMATION, deleteModeForSdk(sdkInt = 35))
     }
+
+    @Test
+    fun reviewErrorsUseActionableMessages() {
+        assertEquals(
+            "Media access changed. Grant access and try again.",
+            reviewErrorMessage(SecurityException())
+        )
+        assertEquals(
+            "Could not update screenshots. Try again.",
+            reviewErrorMessage(IllegalStateException())
+        )
+    }
 }

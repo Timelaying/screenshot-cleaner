@@ -63,7 +63,7 @@ internal fun screenshotNotificationContent(
     count: Int,
     ageDays: Long
 ): ScreenshotNotificationContent = ScreenshotNotificationContent(
-    title = "$count old screenshots found",
+    title = if (count == 1) "1 old screenshot found" else "$count old screenshots found",
     text = "Review screenshots older than $ageDays days."
 )
 

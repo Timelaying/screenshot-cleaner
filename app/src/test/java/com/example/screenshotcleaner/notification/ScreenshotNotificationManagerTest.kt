@@ -11,6 +11,17 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class ScreenshotNotificationManagerTest {
     @Test
+    fun notificationCopyUsesSingularScreenshotLabelForOneResult() {
+        assertEquals(
+            ScreenshotNotificationContent(
+                title = "1 old screenshot found",
+                text = "Review screenshots older than 30 days."
+            ),
+            screenshotNotificationContent(count = 1, ageDays = 30L)
+        )
+    }
+
+    @Test
     fun notificationCopyUsesConfiguredScreenshotAge() {
         assertEquals(
             ScreenshotNotificationContent(

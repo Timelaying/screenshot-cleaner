@@ -41,6 +41,7 @@ import com.example.screenshotcleaner.ui.review.ReviewScreen
 import com.example.screenshotcleaner.ui.settings.SettingsScreen
 import com.example.screenshotcleaner.worker.ScreenshotScanWorker
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -124,7 +125,13 @@ private fun ScreenshotCleanerApp(
     fun refreshScreenshots() {
         coroutineScope.launch {
             errorMessage = null
-            screenshots = repository.getPendingOldScreenshots(settings.screenshotAgeDays)
+            attempt {
+                repository.getPendingOldScreenshots(settings.screenshotAgeDays)
+            }.onSuccess { loadedScreenshots ->
+                screenshots = loadedScreenshots
+            }.onFailure { exception ->
+                errorMessage = reviewErrorMessage(exception)
+            }
         }
     }
 
@@ -148,13 +155,17 @@ private fun ScreenshotCleanerApp(
         pendingDelete = null
         if (result.resultCode == Activity.RESULT_OK && item != null) {
             coroutineScope.markDeleted(
-                item,
-                repository,
-                settings.screenshotAgeDays
-            ) { updatedScreenshots ->
-                errorMessage = null
-                screenshots = updatedScreenshots
-            }
+                item = item,
+                repository = repository,
+                ageDays = settings.screenshotAgeDays,
+                updateScreenshots = { updatedScreenshots ->
+                    errorMessage = null
+                    screenshots = updatedScreenshots
+                },
+                onError = { exception ->
+                    errorMessage = reviewErrorMessage(exception)
+                }
+            )
         }
     }
 
@@ -203,8 +214,13 @@ private fun ScreenshotCleanerApp(
                     onKeep = { item ->
                         coroutineScope.launch {
                             errorMessage = null
-                            repository.keep(item)
-                            screenshots = screenshots.drop(1)
+                            attempt {
+                                repository.keep(item)
+                            }.onSuccess {
+                                screenshots = screenshots.drop(1)
+                            }.onFailure { exception ->
+                                errorMessage = reviewErrorMessage(exception)
+                            }
                         }
                     },
                     onDelete = { item ->
@@ -214,17 +230,21 @@ private fun ScreenshotCleanerApp(
                             if (deletedImmediately) {
                                 pendingDelete = null
                                 coroutineScope.markDeleted(
-                                    item,
-                                    repository,
-                                    settings.screenshotAgeDays
-                                ) { updatedScreenshots ->
-                                    errorMessage = null
-                                    screenshots = updatedScreenshots
-                                }
+                                    item = item,
+                                    repository = repository,
+                                    ageDays = settings.screenshotAgeDays,
+                                    updateScreenshots = { updatedScreenshots ->
+                                        errorMessage = null
+                                        screenshots = updatedScreenshots
+                                    },
+                                    onError = { exception ->
+                                        errorMessage = reviewErrorMessage(exception)
+                                    }
+                                )
                             }
-                        } catch (exception: RuntimeException) {
+                        } catch (exception: Exception) {
                             pendingDelete = null
-                            errorMessage = exception.message ?: "Delete request failed."
+                            errorMessage = reviewErrorMessage(exception)
                         }
                     },
                     onRefresh = { refreshScreenshots() },
@@ -257,11 +277,15 @@ private fun kotlinx.coroutines.CoroutineScope.markDeleted(
     item: ScreenshotItem,
     repository: ScreenshotRepository,
     ageDays: Long,
-    updateScreenshots: (List<ScreenshotItem>) -> Unit
+    updateScreenshots: (List<ScreenshotItem>) -> Unit,
+    onError: (Throwable) -> Unit
 ) {
     launch {
-        repository.markDeleted(item)
-        updateScreenshots(repository.getPendingOldScreenshots(ageDays))
+        attempt {
+            repository.markDeleted(item)
+            repository.getPendingOldScreenshots(ageDays)
+        }.onSuccess(updateScreenshots)
+            .onFailure(onError)
     }
 }
 
@@ -369,3 +393,18 @@ internal fun deleteModeForSdk(sdkInt: Int): DeleteMode =
     } else {
         DeleteMode.DIRECT
     }
+
+private suspend fun <T> attempt(block: suspend () -> T): Result<T> {
+    return try {
+        Result.success(block())
+    } catch (exception: CancellationException) {
+        throw exception
+    } catch (exception: Exception) {
+        Result.failure(exception)
+    }
+}
+
+internal fun reviewErrorMessage(exception: Throwable): String = when (exception) {
+    is SecurityException -> "Media access changed. Grant access and try again."
+    else -> "Could not update screenshots. Try again."
+}

@@ -365,14 +365,14 @@ private fun ComponentActivity.requestDelete(
     uri: Uri,
     launch: (IntentSenderRequest) -> Unit
 ): Boolean {
-    return when (deleteModeForSdk(Build.VERSION.SDK_INT)) {
-        DeleteMode.USER_CONFIRMATION -> {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        run {
             val pendingIntent = MediaStore.createDeleteRequest(contentResolver, listOf(uri))
             launch(IntentSenderRequest.Builder(pendingIntent.intentSender).build())
             false
         }
-
-        DeleteMode.DIRECT -> {
+    } else {
+        run {
             val deletedRows = contentResolver.delete(uri, null, null)
             if (deletedRows == 0) {
                 throw RuntimeException("Android did not delete this screenshot.")

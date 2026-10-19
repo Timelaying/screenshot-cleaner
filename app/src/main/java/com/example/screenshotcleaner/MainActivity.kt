@@ -38,6 +38,7 @@ import com.example.screenshotcleaner.domain.ScreenshotItem
 import com.example.screenshotcleaner.notification.ScreenshotNotificationManager
 import com.example.screenshotcleaner.ui.onboarding.OnboardingScreen
 import com.example.screenshotcleaner.ui.review.ReviewScreen
+import com.example.screenshotcleaner.ui.review.pendingAfterKeeping
 import com.example.screenshotcleaner.ui.settings.SettingsScreen
 import com.example.screenshotcleaner.worker.ScreenshotScanWorker
 import java.util.concurrent.TimeUnit
@@ -217,7 +218,7 @@ private fun ScreenshotCleanerApp(
                             attempt {
                                 repository.keep(item)
                             }.onSuccess {
-                                screenshots = screenshots.drop(1)
+                                screenshots = screenshots.pendingAfterKeeping(item)
                             }.onFailure { exception ->
                                 errorMessage = reviewErrorMessage(exception)
                             }

@@ -74,16 +74,24 @@ fun ReviewScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
+        if (errorMessage != null) {
+            Text(text = errorMessage, color = MaterialTheme.colorScheme.error)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
         if (current == null) {
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxWidth().weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "All done", style = MaterialTheme.typography.headlineMedium)
+                if (errorMessage == null) {
+                    Text(text = "All done", style = MaterialTheme.typography.headlineMedium)
+                }
             }
         } else {
             ScreenshotCard(
                 item = current,
+                modifier = Modifier.fillMaxWidth().weight(1f),
                 onKeep = { onKeep(current) },
                 onDelete = { deleteCandidate = current }
             )
@@ -96,11 +104,6 @@ fun ReviewScreen(
                     Text("Keep")
                 }
             }
-        }
-
-        if (errorMessage != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = errorMessage, color = MaterialTheme.colorScheme.error)
         }
     }
 
@@ -131,6 +134,7 @@ fun ReviewScreen(
 @Composable
 private fun ScreenshotCard(
     item: ScreenshotItem,
+    modifier: Modifier,
     onKeep: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -140,9 +144,7 @@ private fun ScreenshotCard(
         model = item.uri,
         contentDescription = item.displayName,
         contentScale = ContentScale.Fit,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(520.dp)
+        modifier = modifier
             .clip(RoundedCornerShape(8.dp))
             .pointerInput(item.id) {
                 detectDragGestures(

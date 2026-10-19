@@ -6,14 +6,83 @@ import com.example.screenshotcleaner.data.local.ScreenshotDecisionEntity
 import com.example.screenshotcleaner.data.media.ScreenshotDataSource
 import com.example.screenshotcleaner.domain.ScreenshotDecision
 import com.example.screenshotcleaner.domain.ScreenshotItem
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class ScreenshotRepositoryTest {
+    @Test
+    fun blockingScanRunsOffTheCallingThreadByDefault() = runTest {
+        val callerThread = Thread.currentThread()
+        var scannerThread: Thread? = null
+        val scanner = object : ScreenshotDataSource {
+            override fun findOldScreenshots(ageDays: Long): List<ScreenshotItem> {
+                scannerThread = Thread.currentThread()
+                return listOf(screenshot(id = 1))
+            }
+        }
+
+        val pending = ScreenshotRepository(scanner, FakeScreenshotDecisionDao())
+            .getPendingOldScreenshots()
+
+        assertEquals(listOf(1L), pending.map { it.id })
+        assertNotSame(callerThread, scannerThread)
+    }
+
+    @Test
+    fun backgroundScanFailureReachesTheCaller() = runTest {
+        val failure = SecurityException("Media access revoked")
+        val scanner = object : ScreenshotDataSource {
+            override fun findOldScreenshots(ageDays: Long): List<ScreenshotItem> = throw failure
+        }
+
+        try {
+            ScreenshotRepository(scanner, FakeScreenshotDecisionDao()).getPendingOldScreenshots()
+            fail("Expected the scan failure")
+        } catch (exception: SecurityException) {
+            assertEquals(failure.message, exception.message)
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun cancelledQueuedScanDoesNotQueryMediaStore() = runTest {
+        var scanned = false
+        val scanner = object : ScreenshotDataSource {
+            override fun findOldScreenshots(ageDays: Long): List<ScreenshotItem> {
+                scanned = true
+                return emptyList()
+            }
+        }
+        val repository = ScreenshotRepository(
+            scanner,
+            FakeScreenshotDecisionDao(),
+            StandardTestDispatcher(testScheduler)
+        )
+
+        val job = launch(start = CoroutineStart.UNDISPATCHED) {
+            repository.getPendingOldScreenshots()
+        }
+        assertFalse(scanned)
+        job.cancel()
+        runCurrent()
+        job.cancelAndJoin()
+
+        assertFalse(scanned)
+    }
+
     @Test
     fun pendingScreenshotsExcludeKeptAndDeletedItems() = runTest {
         val scanner = FakeScreenshotDataSource(
@@ -32,6 +101,37 @@ class ScreenshotRepositoryTest {
         val pending = repository.getPendingOldScreenshots()
 
         assertEquals(listOf(3L), pending.map { it.id })
+    }
+
+    @Test
+    fun screenshotKeptDuringScanDoesNotReappear() = runTest {
+        assertDecisionSavedDuringScanIsExcluded(ScreenshotDecision.KEPT)
+    }
+
+    @Test
+    fun screenshotDeletedDuringScanDoesNotReappear() = runTest {
+        assertDecisionSavedDuringScanIsExcluded(ScreenshotDecision.DELETED)
+    }
+
+    private suspend fun assertDecisionSavedDuringScanIsExcluded(decision: ScreenshotDecision) {
+        val decidedItem = screenshot(id = 1)
+        val undecidedItem = screenshot(id = 2)
+        val dao = FakeScreenshotDecisionDao()
+        val scanner = object : ScreenshotDataSource {
+            override fun findOldScreenshots(ageDays: Long): List<ScreenshotItem> {
+                // Model a decision committed after scanning starts but before it returns.
+                dao.decisions[decidedItem.id] = ScreenshotDecisionEntity(
+                    mediaId = decidedItem.id,
+                    decision = decision,
+                    decidedAtMillis = 10
+                )
+                return listOf(decidedItem, undecidedItem)
+            }
+        }
+
+        val pending = ScreenshotRepository(scanner, dao).getPendingOldScreenshots()
+
+        assertEquals(listOf(undecidedItem), pending)
     }
 
     @Test

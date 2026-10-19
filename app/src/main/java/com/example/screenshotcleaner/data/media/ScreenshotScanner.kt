@@ -56,7 +56,7 @@ class ScreenshotScanner(
                     }
                 }
             }
-        }.orEmpty()
+        } ?: throw IllegalStateException("MediaStore did not return a screenshot query result.")
     }
 }
 

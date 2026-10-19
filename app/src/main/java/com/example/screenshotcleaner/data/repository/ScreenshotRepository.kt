@@ -6,18 +6,26 @@ import com.example.screenshotcleaner.data.media.ScreenshotDataSource
 import com.example.screenshotcleaner.data.settings.DEFAULT_SCREENSHOT_AGE_DAYS
 import com.example.screenshotcleaner.domain.ScreenshotDecision
 import com.example.screenshotcleaner.domain.ScreenshotItem
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class ScreenshotRepository(
     private val scanner: ScreenshotDataSource,
-    private val decisionDao: ScreenshotDecisionDao
+    private val decisionDao: ScreenshotDecisionDao,
+    private val scanDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
-    suspend fun getPendingOldScreenshots(ageDays: Long = DEFAULT_SCREENSHOT_AGE_DAYS): List<ScreenshotItem> {
+    suspend fun getPendingOldScreenshots(
+        ageDays: Long = DEFAULT_SCREENSHOT_AGE_DAYS
+    ): List<ScreenshotItem> = withContext(scanDispatcher) {
+        // Keep blocking MediaStore queries and cursor iteration on the scan dispatcher.
+        val screenshots = scanner.findOldScreenshots(ageDays)
+        // Include decisions saved while the scan was running before returning the review queue.
         val decidedIds = decisionDao.mediaIdsForDecisions(
             listOf(ScreenshotDecision.KEPT, ScreenshotDecision.DELETED)
         ).toSet()
 
-        return scanner.findOldScreenshots(ageDays)
-            .filterNot { it.id in decidedIds }
+        screenshots.filterNot { it.id in decidedIds }
     }
 
     suspend fun keep(item: ScreenshotItem) {

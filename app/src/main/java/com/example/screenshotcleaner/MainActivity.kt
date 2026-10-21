@@ -38,6 +38,7 @@ import com.example.screenshotcleaner.domain.ScreenshotItem
 import com.example.screenshotcleaner.notification.ScreenshotNotificationManager
 import com.example.screenshotcleaner.ui.onboarding.OnboardingScreen
 import com.example.screenshotcleaner.ui.review.ReviewScreen
+import com.example.screenshotcleaner.ui.review.ScreenshotRefresh
 import com.example.screenshotcleaner.ui.review.pendingAfterKeeping
 import com.example.screenshotcleaner.ui.settings.SettingsScreen
 import com.example.screenshotcleaner.worker.ScreenshotScanWorker
@@ -122,18 +123,21 @@ private fun ScreenshotCleanerApp(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var destination by remember { mutableStateOf(AppDestination.REVIEW) }
     val settings by settingsRepository.settings.collectAsState(initial = AppSettings())
+    val screenshotRefresh = remember(repository, coroutineScope) {
+        ScreenshotRefresh(coroutineScope, repository::getPendingOldScreenshots)
+    }
 
     fun refreshScreenshots() {
-        coroutineScope.launch {
-            errorMessage = null
-            attempt {
-                repository.getPendingOldScreenshots(settings.screenshotAgeDays)
-            }.onSuccess { loadedScreenshots ->
+        errorMessage = null
+        screenshotRefresh.refresh(
+            ageDays = settings.screenshotAgeDays,
+            onSuccess = { loadedScreenshots ->
                 screenshots = loadedScreenshots
-            }.onFailure { exception ->
+            },
+            onFailure = { exception ->
                 errorMessage = reviewErrorMessage(exception)
             }
-        }
+        )
     }
 
     val imagePermissionLauncher = rememberLauncherForActivityResult(

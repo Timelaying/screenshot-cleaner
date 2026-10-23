@@ -222,6 +222,7 @@ private fun ScreenshotCleanerApp(
                             attempt {
                                 repository.keep(item)
                             }.onSuccess {
+                                screenshotRefresh.onKeepSaved(item)
                                 screenshots = screenshots.pendingAfterKeeping(item)
                             }.onFailure { exception ->
                                 errorMessage = reviewErrorMessage(exception)

@@ -39,7 +39,7 @@ import com.example.screenshotcleaner.notification.ScreenshotNotificationManager
 import com.example.screenshotcleaner.ui.onboarding.OnboardingScreen
 import com.example.screenshotcleaner.ui.review.ReviewScreen
 import com.example.screenshotcleaner.ui.review.ScreenshotRefresh
-import com.example.screenshotcleaner.ui.review.pendingAfterKeeping
+import com.example.screenshotcleaner.ui.review.pendingAfterDecision
 import com.example.screenshotcleaner.ui.settings.SettingsScreen
 import com.example.screenshotcleaner.worker.ScreenshotScanWorker
 import java.util.concurrent.TimeUnit
@@ -140,6 +140,20 @@ private fun ScreenshotCleanerApp(
         )
     }
 
+    fun markDeleted(item: ScreenshotItem) {
+        coroutineScope.launch {
+            attempt {
+                repository.markDeleted(item)
+            }.onSuccess {
+                screenshotRefresh.onDecisionSaved(item)
+                screenshots = screenshots.pendingAfterDecision(item)
+                errorMessage = null
+            }.onFailure { exception ->
+                errorMessage = reviewErrorMessage(exception)
+            }
+        }
+    }
+
     val imagePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
@@ -159,18 +173,7 @@ private fun ScreenshotCleanerApp(
         val item = pendingDelete
         pendingDelete = null
         if (result.resultCode == Activity.RESULT_OK && item != null) {
-            coroutineScope.markDeleted(
-                item = item,
-                repository = repository,
-                ageDays = settings.screenshotAgeDays,
-                updateScreenshots = { updatedScreenshots ->
-                    errorMessage = null
-                    screenshots = updatedScreenshots
-                },
-                onError = { exception ->
-                    errorMessage = reviewErrorMessage(exception)
-                }
-            )
+            markDeleted(item)
         }
     }
 
@@ -222,7 +225,8 @@ private fun ScreenshotCleanerApp(
                             attempt {
                                 repository.keep(item)
                             }.onSuccess {
-                                screenshots = screenshots.pendingAfterKeeping(item)
+                                screenshotRefresh.onDecisionSaved(item)
+                                screenshots = screenshots.pendingAfterDecision(item)
                             }.onFailure { exception ->
                                 errorMessage = reviewErrorMessage(exception)
                             }
@@ -234,18 +238,7 @@ private fun ScreenshotCleanerApp(
                             val deletedImmediately = activity.requestDelete(item.uri, deleteLauncher::launch)
                             if (deletedImmediately) {
                                 pendingDelete = null
-                                coroutineScope.markDeleted(
-                                    item = item,
-                                    repository = repository,
-                                    ageDays = settings.screenshotAgeDays,
-                                    updateScreenshots = { updatedScreenshots ->
-                                        errorMessage = null
-                                        screenshots = updatedScreenshots
-                                    },
-                                    onError = { exception ->
-                                        errorMessage = reviewErrorMessage(exception)
-                                    }
-                                )
+                                markDeleted(item)
                             }
                         } catch (exception: Exception) {
                             pendingDelete = null
@@ -277,22 +270,6 @@ private fun ScreenshotCleanerApp(
 
 internal fun Intent.isReviewScreenIntent(): Boolean =
     action == ScreenshotNotificationManager.ACTION_REVIEW_SCREEN
-
-private fun kotlinx.coroutines.CoroutineScope.markDeleted(
-    item: ScreenshotItem,
-    repository: ScreenshotRepository,
-    ageDays: Long,
-    updateScreenshots: (List<ScreenshotItem>) -> Unit,
-    onError: (Throwable) -> Unit
-) {
-    launch {
-        attempt {
-            repository.markDeleted(item)
-            repository.getPendingOldScreenshots(ageDays)
-        }.onSuccess(updateScreenshots)
-            .onFailure(onError)
-    }
-}
 
 private enum class AppDestination {
     REVIEW,

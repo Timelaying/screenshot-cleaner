@@ -14,11 +14,11 @@ internal class ScreenshotRefresh(
     private val loadScreenshots: suspend (Long) -> List<ScreenshotItem>
 ) {
     private var refreshJob: Job? = null
-    private val keptDuringRefresh = mutableSetOf<Long>()
+    private val decidedDuringRefresh = mutableSetOf<Long>()
 
     // Call only after Room has saved the decision, on the same UI thread as refresh.
-    fun onKeepSaved(item: ScreenshotItem) {
-        keptDuringRefresh += item.id
+    fun onDecisionSaved(item: ScreenshotItem) {
+        decidedDuringRefresh += item.id
     }
 
     fun refresh(
@@ -28,7 +28,7 @@ internal class ScreenshotRefresh(
     ) {
         refreshJob?.cancel()
         // New scans read the saved decisions from Room; only overlapping saves need this guard.
-        keptDuringRefresh.clear()
+        decidedDuringRefresh.clear()
         refreshJob = scope.launch {
             val result = try {
                 Result.success(loadScreenshots(ageDays))
@@ -40,7 +40,7 @@ internal class ScreenshotRefresh(
             // A blocking provider may finish after cancellation. Never publish its stale result.
             currentCoroutineContext().ensureActive()
             result.onSuccess { items ->
-                onSuccess(items.filterNot { it.id in keptDuringRefresh })
+                onSuccess(items.filterNot { it.id in decidedDuringRefresh })
             }.onFailure(onFailure)
         }
     }

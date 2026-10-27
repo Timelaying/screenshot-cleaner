@@ -15,8 +15,8 @@ class ReviewQueueTest {
         val next = screenshot(2)
         val queue = listOf(kept, next)
 
-        val afterFirstSave = queue.pendingAfterKeeping(kept)
-        val afterSecondSave = afterFirstSave.pendingAfterKeeping(kept)
+        val afterFirstSave = queue.pendingAfterDecision(kept)
+        val afterSecondSave = afterFirstSave.pendingAfterDecision(kept)
 
         assertEquals(listOf(next), afterFirstSave)
         assertEquals(listOf(next), afterSecondSave)
@@ -32,7 +32,7 @@ class ReviewQueueTest {
 
         assertEquals(
             listOf(newlyFound, next),
-            refreshedQueue.pendingAfterKeeping(kept)
+            refreshedQueue.pendingAfterDecision(kept)
         )
     }
 
@@ -41,8 +41,8 @@ class ReviewQueueTest {
         val kept = screenshot(1)
         val next = screenshot(2)
 
-        assertEquals(listOf(next), listOf(next).pendingAfterKeeping(kept))
-        assertEquals(emptyList<ScreenshotItem>(), emptyList<ScreenshotItem>().pendingAfterKeeping(kept))
+        assertEquals(listOf(next), listOf(next).pendingAfterDecision(kept))
+        assertEquals(emptyList<ScreenshotItem>(), emptyList<ScreenshotItem>().pendingAfterDecision(kept))
     }
 
     private fun screenshot(id: Long) = ScreenshotItem(

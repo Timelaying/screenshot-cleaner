@@ -30,8 +30,8 @@ class KeepDuringScreenshotRefreshTest {
         refresh.refresh(30, { queue = it }, { throw AssertionError(it) })
         runCurrent()
         for (item in listOf(first, first, second)) {
-            refresh.onKeepSaved(item)
-            queue = queue.pendingAfterKeeping(item)
+            refresh.onDecisionSaved(item)
+            queue = queue.pendingAfterDecision(item)
         }
         assertEquals(listOf(remaining), queue)
 
@@ -50,8 +50,8 @@ class KeepDuringScreenshotRefreshTest {
         refresh.refresh(30, { queue = it }, { throw AssertionError(it) })
         runCurrent()
         assertEquals(listOf(kept, remaining), queue)
-        refresh.onKeepSaved(kept)
-        queue = queue.pendingAfterKeeping(kept)
+        refresh.onDecisionSaved(kept)
+        queue = queue.pendingAfterDecision(kept)
 
         assertEquals(listOf(remaining), queue)
     }
@@ -68,7 +68,7 @@ class KeepDuringScreenshotRefreshTest {
 
         refresh.refresh(30, { queue = it }, { throw AssertionError(it) })
         runCurrent()
-        // The failure path does not call onKeepSaved because no Room decision was saved.
+        // The failure path does not call onDecisionSaved because no Room decision was saved.
         releaseSnapshot.complete(Unit)
         runCurrent()
 

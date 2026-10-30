@@ -1,7 +1,6 @@
 package com.example.screenshotcleaner
 
 import android.Manifest
-import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -37,6 +36,7 @@ import com.example.screenshotcleaner.data.settings.SettingsRepository
 import com.example.screenshotcleaner.domain.ScreenshotItem
 import com.example.screenshotcleaner.notification.ScreenshotNotificationManager
 import com.example.screenshotcleaner.ui.onboarding.OnboardingScreen
+import com.example.screenshotcleaner.ui.review.PendingScreenshotDelete
 import com.example.screenshotcleaner.ui.review.ReviewScreen
 import com.example.screenshotcleaner.ui.review.ScreenshotRefresh
 import com.example.screenshotcleaner.ui.review.pendingAfterDecision
@@ -55,6 +55,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val pendingDelete = PendingScreenshotDelete(savedStateRegistry)
         if (intent.isReviewScreenIntent()) {
             reviewIntentVersion = 1
         }
@@ -67,6 +68,7 @@ class MainActivity : ComponentActivity() {
                         activity = this,
                         repository = app.repository,
                         settingsRepository = app.settingsRepository,
+                        pendingDelete = pendingDelete,
                         reviewIntentVersion = reviewIntentVersion,
                         permissionStateVersion = permissionStateVersion,
                         onReminderSchedulingChanged = ::setReminderScheduling
@@ -111,6 +113,7 @@ private fun ScreenshotCleanerApp(
     activity: ComponentActivity,
     repository: ScreenshotRepository,
     settingsRepository: SettingsRepository,
+    pendingDelete: PendingScreenshotDelete,
     reviewIntentVersion: Int,
     permissionStateVersion: Int,
     onReminderSchedulingChanged: (Boolean) -> Unit
@@ -119,7 +122,6 @@ private fun ScreenshotCleanerApp(
     var imageAccess by remember { mutableStateOf(activity.imageAccessState()) }
     var hasNotificationPermission by remember { mutableStateOf(activity.hasNotificationPermission()) }
     var screenshots by remember { mutableStateOf<List<ScreenshotItem>>(emptyList()) }
-    var pendingDelete by remember { mutableStateOf<ScreenshotItem?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var destination by remember { mutableStateOf(AppDestination.REVIEW) }
     val settings by settingsRepository.settings.collectAsState(initial = AppSettings())
@@ -170,11 +172,7 @@ private fun ScreenshotCleanerApp(
     val deleteLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
-        val item = pendingDelete
-        pendingDelete = null
-        if (result.resultCode == Activity.RESULT_OK && item != null) {
-            markDeleted(item)
-        }
+        pendingDelete.complete(result.resultCode)?.let(::markDeleted)
     }
 
     LaunchedEffect(imageAccess, settings.screenshotAgeDays) {
@@ -233,15 +231,15 @@ private fun ScreenshotCleanerApp(
                         }
                     },
                     onDelete = { item ->
-                        pendingDelete = item
+                        pendingDelete.item = item
                         try {
                             val deletedImmediately = activity.requestDelete(item.uri, deleteLauncher::launch)
                             if (deletedImmediately) {
-                                pendingDelete = null
+                                pendingDelete.item = null
                                 markDeleted(item)
                             }
                         } catch (exception: Exception) {
-                            pendingDelete = null
+                            pendingDelete.item = null
                             errorMessage = reviewErrorMessage(exception)
                         }
                     },

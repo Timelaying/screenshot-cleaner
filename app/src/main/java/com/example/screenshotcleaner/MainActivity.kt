@@ -15,6 +15,7 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -196,7 +197,8 @@ private fun ScreenshotCleanerApp(
         onReminderSchedulingChanged(settings.remindersEnabled)
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    // Keep every screen's controls clear of system bars and display cutouts.
+    Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
         if (shouldShowOnboarding(imageAccess, hasNotificationPermission)) {
             OnboardingScreen(
                 hasImagePermission = imageAccess == ImageAccessState.FULL,

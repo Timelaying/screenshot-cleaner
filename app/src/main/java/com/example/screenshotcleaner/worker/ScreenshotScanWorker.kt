@@ -10,8 +10,11 @@ import androidx.work.CoroutineWorker
 import androidx.work.ListenableWorker.Result
 import androidx.work.WorkerParameters
 import com.example.screenshotcleaner.ScreenshotCleanerApplication
+import com.example.screenshotcleaner.data.settings.AppSettings
 import com.example.screenshotcleaner.hasRequiredMediaAccess
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
 class ScreenshotScanWorker(
     appContext: Context,
@@ -19,38 +22,50 @@ class ScreenshotScanWorker(
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         val app = applicationContext as ScreenshotCleanerApplication
-        if (!shouldRunScreenshotScan(
-                hasFullImageAccess = applicationContext.hasFullImageAccess(),
-                hasNotificationPermission = applicationContext.hasNotificationPermission(),
-                remindersEnabled = app.settingsRepository.remindersEnabled()
-            )
-        ) {
-            return Result.success()
-        }
-
-        return try {
-            val ageDays = app.settingsRepository.screenshotAgeDays()
+        return runConfiguredScreenshotScan(
+            settings = app.settingsRepository.settings,
+            hasFullImageAccess = applicationContext.hasFullImageAccess(),
+            hasNotificationPermission = applicationContext.hasNotificationPermission()
+        ) { ageDays ->
             val screenshots = app.repository.getPendingOldScreenshots(ageDays)
             if (shouldNotifyForOldScreenshots(screenshots.size)) {
                 app.notificationManager.createChannel()
                 app.notificationManager.showOldScreenshotsFound(screenshots.size, ageDays)
             }
-
-            Result.success()
-        } catch (exception: CancellationException) {
-            throw exception
-        } catch (exception: SecurityException) {
-            Log.w(TAG, "Screenshot access changed while scanning; skipping this run.", exception)
-            scanFailureAction(exception).result()
-        } catch (exception: Exception) {
-            Log.w(TAG, "Screenshot scan failed; retrying.", exception)
-            scanFailureAction(exception).result()
         }
     }
 
     companion object {
         const val WORK_NAME = "old-screenshot-scan"
-        private const val TAG = "ScreenshotScanWorker"
+    }
+}
+
+internal suspend fun runConfiguredScreenshotScan(
+    settings: Flow<AppSettings>,
+    hasFullImageAccess: Boolean,
+    hasNotificationPermission: Boolean,
+    scan: suspend (Long) -> Unit
+): Result {
+    return try {
+        // Read one snapshot inside the retry boundary, including the reminders preference.
+        val snapshot = settings.first()
+        if (shouldRunScreenshotScan(
+                hasFullImageAccess = hasFullImageAccess,
+                hasNotificationPermission = hasNotificationPermission,
+                remindersEnabled = snapshot.remindersEnabled
+            )
+        ) {
+            scan(snapshot.screenshotAgeDays)
+        }
+        Result.success()
+    } catch (exception: CancellationException) {
+        throw exception
+    } catch (exception: SecurityException) {
+        Log.w("ScreenshotScanWorker", "Screenshot access changed while scanning; skipping this run.", exception)
+        scanFailureAction(exception).result()
+    } catch (exception: Exception) {
+        Log.w("ScreenshotScanWorker", "Screenshot scan failed; retrying.", exception)
+        scanFailureAction(exception).result()
     }
 }
 

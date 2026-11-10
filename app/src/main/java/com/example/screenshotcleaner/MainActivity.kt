@@ -42,6 +42,7 @@ import com.example.screenshotcleaner.ui.review.ReviewScreen
 import com.example.screenshotcleaner.ui.review.ScreenshotRefresh
 import com.example.screenshotcleaner.ui.review.pendingAfterDecision
 import com.example.screenshotcleaner.ui.settings.SettingsScreen
+import com.example.screenshotcleaner.ui.settings.saveSettingsChange
 import com.example.screenshotcleaner.worker.ScreenshotScanWorker
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
@@ -124,6 +125,7 @@ private fun ScreenshotCleanerApp(
     var hasNotificationPermission by remember { mutableStateOf(activity.hasNotificationPermission()) }
     var screenshots by remember { mutableStateOf<List<ScreenshotItem>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var settingsErrorMessage by remember { mutableStateOf<String?>(null) }
     var destination by remember { mutableStateOf(AppDestination.REVIEW) }
     val settings by settingsRepository.settings.collectAsState(initial = AppSettings())
     val screenshotRefresh = remember(repository, coroutineScope) {
@@ -251,14 +253,19 @@ private fun ScreenshotCleanerApp(
 
                 AppDestination.SETTINGS -> SettingsScreen(
                     settings = settings,
+                    errorMessage = settingsErrorMessage,
                     onRemindersEnabledChange = { enabled ->
                         coroutineScope.launch {
-                            settingsRepository.setRemindersEnabled(enabled)
+                            settingsErrorMessage = saveSettingsChange {
+                                settingsRepository.setRemindersEnabled(enabled)
+                            }
                         }
                     },
                     onScreenshotAgeDaysChange = { ageDays ->
                         coroutineScope.launch {
-                            settingsRepository.setScreenshotAgeDays(ageDays)
+                            settingsErrorMessage = saveSettingsChange {
+                                settingsRepository.setScreenshotAgeDays(ageDays)
+                            }
                         }
                     },
                     onBack = { destination = AppDestination.REVIEW }

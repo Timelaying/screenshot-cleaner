@@ -32,7 +32,6 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.screenshotcleaner.data.repository.ScreenshotRepository
-import com.example.screenshotcleaner.data.settings.AppSettings
 import com.example.screenshotcleaner.data.settings.SettingsRepository
 import com.example.screenshotcleaner.domain.ScreenshotItem
 import com.example.screenshotcleaner.notification.ScreenshotNotificationManager
@@ -41,7 +40,10 @@ import com.example.screenshotcleaner.ui.review.PendingScreenshotDelete
 import com.example.screenshotcleaner.ui.review.ReviewScreen
 import com.example.screenshotcleaner.ui.review.ScreenshotRefresh
 import com.example.screenshotcleaner.ui.review.pendingAfterDecision
+import com.example.screenshotcleaner.ui.settings.SettingsLoadScreen
+import com.example.screenshotcleaner.ui.settings.SettingsLoadState
 import com.example.screenshotcleaner.ui.settings.SettingsScreen
+import com.example.screenshotcleaner.ui.settings.settingsLoadStates
 import com.example.screenshotcleaner.worker.ScreenshotScanWorker
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
@@ -125,15 +127,21 @@ private fun ScreenshotCleanerApp(
     var screenshots by remember { mutableStateOf<List<ScreenshotItem>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var destination by remember { mutableStateOf(AppDestination.REVIEW) }
-    val settings by settingsRepository.settings.collectAsState(initial = AppSettings())
+    var settingsReadAttempt by remember { mutableIntStateOf(0) }
+    val settingsStates = remember(settingsRepository, settingsReadAttempt) {
+        settingsRepository.settings.settingsLoadStates()
+    }
+    val settingsState by settingsStates.collectAsState(initial = SettingsLoadState.Loading)
+    val settings = (settingsState as? SettingsLoadState.Ready)?.settings
     val screenshotRefresh = remember(repository, coroutineScope) {
         ScreenshotRefresh(coroutineScope, repository::getPendingOldScreenshots)
     }
 
     fun refreshScreenshots() {
+        val loadedSettings = settings ?: return
         errorMessage = null
         screenshotRefresh.refresh(
-            ageDays = settings.screenshotAgeDays,
+            ageDays = loadedSettings.screenshotAgeDays,
             onSuccess = { loadedScreenshots ->
                 screenshots = loadedScreenshots
             },
@@ -176,7 +184,7 @@ private fun ScreenshotCleanerApp(
         pendingDelete.complete(result.resultCode)?.let(::markDeleted)
     }
 
-    LaunchedEffect(imageAccess, settings.screenshotAgeDays) {
+    LaunchedEffect(imageAccess, settings?.screenshotAgeDays) {
         if (imageAccess == ImageAccessState.FULL) refreshScreenshots()
     }
 
@@ -191,13 +199,18 @@ private fun ScreenshotCleanerApp(
         hasNotificationPermission = activity.hasNotificationPermission()
     }
 
-    LaunchedEffect(settings.remindersEnabled) {
-        onReminderSchedulingChanged(settings.remindersEnabled)
+    LaunchedEffect(settings?.remindersEnabled) {
+        settings?.let { onReminderSchedulingChanged(it.remindersEnabled) }
     }
 
     // Keep every screen's controls clear of system bars and display cutouts.
     Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
-        if (shouldShowOnboarding(imageAccess, hasNotificationPermission)) {
+        if (settings == null) {
+            SettingsLoadScreen(
+                failed = settingsState == SettingsLoadState.Failed,
+                onRetry = { settingsReadAttempt++ }
+            )
+        } else if (shouldShowOnboarding(imageAccess, hasNotificationPermission)) {
             OnboardingScreen(
                 hasImagePermission = imageAccess == ImageAccessState.FULL,
                 imagePermissionStatus = imageAccess.statusLabel,

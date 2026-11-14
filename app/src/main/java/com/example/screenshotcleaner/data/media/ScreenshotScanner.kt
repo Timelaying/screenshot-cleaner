@@ -35,15 +35,21 @@ class ScreenshotScanner(
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
             val addedColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
             val modifiedColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_MODIFIED)
-            val pathColumn = cursor.getColumnIndex(MediaStore.Images.Media.RELATIVE_PATH)
+            val folderColumn = cursor.getColumnIndex(
+                if (sdkInt >= Build.VERSION_CODES.Q) {
+                    MediaStore.Images.Media.RELATIVE_PATH
+                } else {
+                    MediaStore.Images.ImageColumns.BUCKET_DISPLAY_NAME
+                }
+            )
 
             buildList {
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(idColumn)
                     val displayName = cursor.getString(nameColumn).orEmpty()
-                    val relativePath = pathColumn.takeIf { it >= 0 }?.let(cursor::getString)
+                    val folder = folderColumn.takeIf { it >= 0 }?.let(cursor::getString)
 
-                    if (ScreenshotNameMatcher.looksLikeScreenshot(displayName, relativePath)) {
+                    if (ScreenshotNameMatcher.looksLikeScreenshot(displayName, folder)) {
                         add(
                             ScreenshotItem(
                                 id = id,
@@ -84,6 +90,9 @@ internal fun screenshotProjection(includeRelativePath: Boolean): Array<String> {
         add(MediaStore.Images.Media.DATE_MODIFIED)
         if (includeRelativePath) {
             add(MediaStore.Images.Media.RELATIVE_PATH)
+        } else {
+            // Before Android 10, the image bucket identifies the containing folder.
+            add(MediaStore.Images.ImageColumns.BUCKET_DISPLAY_NAME)
         }
     }.toTypedArray()
 }

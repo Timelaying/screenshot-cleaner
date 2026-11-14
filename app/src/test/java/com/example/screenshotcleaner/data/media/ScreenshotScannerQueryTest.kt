@@ -7,6 +7,7 @@ import android.content.pm.ProviderInfo
 import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
 import java.time.Clock
 import java.time.Instant
@@ -23,7 +24,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowContentResolver
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28, 30, 35], application = Application::class, manifest = Config.NONE)
+@Config(sdk = [26, 28, 29, 30, 35], application = Application::class, manifest = Config.NONE)
 class ScreenshotScannerQueryTest {
     private lateinit var provider: QueryResultProvider
     private lateinit var scanner: ScreenshotScanner
@@ -70,6 +71,46 @@ class ScreenshotScannerQueryTest {
     }
 
     @Test
+    fun renamedScreenshotIsFoundByItsFolder() {
+        val folderColumn = if (Build.VERSION.SDK_INT >= 29) "relative_path" else "bucket_display_name"
+        val folder = if (Build.VERSION.SDK_INT >= 29) "Pictures/Screenshots/" else "Screenshots"
+        val cursor = screenshotCursor(folderColumn).apply {
+            addRow(arrayOf(42L, "receipt.png", 1L, 1L, folder))
+        }
+        provider.result = cursor
+
+        assertEquals(listOf(42L), scanner.findOldScreenshots(ageDays = 30).map { it.id })
+        assertTrue(provider.requestedProjection.orEmpty().contains(folderColumn))
+        assertTrue(cursor.isClosed)
+    }
+
+    @Test
+    fun ordinaryPhotosAreNotMatchedByTheirFolder() {
+        val folderColumn = if (Build.VERSION.SDK_INT >= 29) "relative_path" else "bucket_display_name"
+        val folder = if (Build.VERSION.SDK_INT >= 29) "DCIM/Camera/" else "Camera"
+        val cursor = screenshotCursor(folderColumn).apply {
+            addRow(arrayOf(42L, "IMG_42.jpg", 1L, 1L, folder))
+        }
+        provider.result = cursor
+
+        assertTrue(scanner.findOldScreenshots(ageDays = 30).isEmpty())
+        assertTrue(cursor.isClosed)
+    }
+
+    @Test
+    fun nullFolderStillAllowsFilenameDetection() {
+        val folderColumn = if (Build.VERSION.SDK_INT >= 29) "relative_path" else "bucket_display_name"
+        val cursor = screenshotCursor(folderColumn).apply {
+            addRow(arrayOf(42L, "Screenshot_42.png", 1L, 1L, null))
+            addRow(arrayOf(43L, "IMG_43.jpg", 1L, 1L, null))
+        }
+        provider.result = cursor
+
+        assertEquals(listOf(42L), scanner.findOldScreenshots(ageDays = 30).map { it.id })
+        assertTrue(cursor.isClosed)
+    }
+
+    @Test
     fun malformedQueryResultPropagatesFailureAndClosesCursor() {
         val cursor = MatrixCursor(arrayOf(MediaStore.Images.Media._ID))
         provider.result = cursor
@@ -80,18 +121,19 @@ class ScreenshotScannerQueryTest {
         assertTrue(cursor.isClosed)
     }
 
-    private fun screenshotCursor() = MatrixCursor(
+    private fun screenshotCursor(vararg folderColumns: String) = MatrixCursor(
         arrayOf(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
             MediaStore.Images.Media.DATE_ADDED,
             MediaStore.Images.Media.DATE_MODIFIED
-        )
+        ) + folderColumns
     )
 }
 
 private class QueryResultProvider : ContentProvider() {
     var result: Cursor? = null
+    var requestedProjection: Array<out String>? = null
 
     override fun onCreate(): Boolean = true
 
@@ -101,7 +143,10 @@ private class QueryResultProvider : ContentProvider() {
         selection: String?,
         selectionArgs: Array<out String>?,
         sortOrder: String?
-    ): Cursor? = result
+    ): Cursor? {
+        requestedProjection = projection
+        return result
+    }
 
     override fun getType(uri: Uri): String? = null
     override fun insert(uri: Uri, values: ContentValues?): Uri? = error("Unexpected insert")

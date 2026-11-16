@@ -3,14 +3,11 @@ package com.example.screenshotcleaner
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +28,7 @@ import androidx.core.content.ContextCompat
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.example.screenshotcleaner.data.media.ScreenshotDeletion
 import com.example.screenshotcleaner.data.repository.ScreenshotRepository
 import com.example.screenshotcleaner.data.settings.AppSettings
 import com.example.screenshotcleaner.data.settings.SettingsRepository
@@ -120,6 +118,7 @@ private fun ScreenshotCleanerApp(
     onReminderSchedulingChanged: (Boolean) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val screenshotDeletion = remember(activity) { ScreenshotDeletion(activity.contentResolver) }
     var imageAccess by remember { mutableStateOf(activity.imageAccessState()) }
     var hasNotificationPermission by remember { mutableStateOf(activity.hasNotificationPermission()) }
     var screenshots by remember { mutableStateOf<List<ScreenshotItem>>(emptyList()) }
@@ -143,9 +142,10 @@ private fun ScreenshotCleanerApp(
         )
     }
 
-    fun markDeleted(item: ScreenshotItem) {
+    fun markDeleted(item: ScreenshotItem, afterSystemConfirmation: Boolean = false) {
         coroutineScope.launch {
             attempt {
+                if (afterSystemConfirmation) screenshotDeletion.finishConfirmation(item.uri)
                 repository.markDeleted(item)
             }.onSuccess {
                 screenshotRefresh.onDecisionSaved(item)
@@ -173,7 +173,9 @@ private fun ScreenshotCleanerApp(
     val deleteLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
-        pendingDelete.complete(result.resultCode)?.let(::markDeleted)
+        pendingDelete.complete(result.resultCode)?.let { item ->
+            markDeleted(item, afterSystemConfirmation = true)
+        }
     }
 
     LaunchedEffect(imageAccess, settings.screenshotAgeDays) {
@@ -235,7 +237,7 @@ private fun ScreenshotCleanerApp(
                     onDelete = { item ->
                         pendingDelete.item = item
                         try {
-                            val deletedImmediately = activity.requestDelete(item.uri, deleteLauncher::launch)
+                            val deletedImmediately = screenshotDeletion.request(item.uri, deleteLauncher::launch)
                             if (deletedImmediately) {
                                 pendingDelete.item = null
                                 markDeleted(item)
@@ -342,27 +344,6 @@ internal fun hasRequiredMediaAccess(
     hasWriteAccess: Boolean,
     sdkInt: Int
 ): Boolean = hasReadAccess && (sdkInt >= Build.VERSION_CODES.R || hasWriteAccess)
-
-private fun ComponentActivity.requestDelete(
-    uri: Uri,
-    launch: (IntentSenderRequest) -> Unit
-): Boolean {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        run {
-            val pendingIntent = MediaStore.createDeleteRequest(contentResolver, listOf(uri))
-            launch(IntentSenderRequest.Builder(pendingIntent.intentSender).build())
-            false
-        }
-    } else {
-        run {
-            val deletedRows = contentResolver.delete(uri, null, null)
-            if (deletedRows == 0) {
-                throw RuntimeException("Android did not delete this screenshot.")
-            }
-            true
-        }
-    }
-}
 
 internal enum class DeleteMode {
     USER_CONFIRMATION,

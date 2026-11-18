@@ -104,9 +104,11 @@ class ScreenshotDeletionTest {
         val exception = SecurityException("Read permission revoked")
         provider.failure = exception
 
-        assertSame(exception, assertThrows(SecurityException::class.java) {
+        val failure = assertThrows(SecurityException::class.java) {
             runBlocking { deletion.request(uri, requests::add) }
-        })
+        }
+        // Coroutine stack-trace recovery may copy exceptions across dispatchers.
+        assertEquals(exception.message, failure.message)
         assertTrue(requests.isEmpty())
         assertEquals(0, provider.deletedCount)
     }

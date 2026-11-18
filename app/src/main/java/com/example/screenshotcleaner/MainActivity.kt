@@ -43,6 +43,7 @@ import com.example.screenshotcleaner.ui.review.pendingAfterDecision
 import com.example.screenshotcleaner.ui.settings.SettingsLoadScreen
 import com.example.screenshotcleaner.ui.settings.SettingsLoadState
 import com.example.screenshotcleaner.ui.settings.SettingsScreen
+import com.example.screenshotcleaner.ui.settings.saveSettingsChange
 import com.example.screenshotcleaner.ui.settings.settingsLoadStates
 import com.example.screenshotcleaner.worker.ScreenshotScanWorker
 import java.util.concurrent.TimeUnit
@@ -185,7 +186,8 @@ private fun ScreenshotCleanerApp(
         pendingDelete.complete(result.resultCode)?.let(::markDeleted)
     }
 
-    LaunchedEffect(imageAccess, settings?.screenshotAgeDays) {
+    // A reminder can reopen an existing Activity whose review queue is out of date.
+    LaunchedEffect(imageAccess, settings?.screenshotAgeDays, reviewIntentVersion) {
         if (imageAccess == ImageAccessState.FULL) refreshScreenshots()
     }
 

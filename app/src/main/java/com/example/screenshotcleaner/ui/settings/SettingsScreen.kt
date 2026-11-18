@@ -26,6 +26,7 @@ import com.example.screenshotcleaner.data.settings.SUPPORTED_SCREENSHOT_AGE_DAYS
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
+    errorMessage: String?,
     onRemindersEnabledChange: (Boolean) -> Unit,
     onScreenshotAgeDaysChange: (Long) -> Unit,
     onBack: () -> Unit
@@ -46,6 +47,10 @@ fun SettingsScreen(
             TextButton(onClick = onBack) {
                 Text("Review")
             }
+        }
+
+        if (errorMessage != null) {
+            Text(text = errorMessage, color = MaterialTheme.colorScheme.error)
         }
 
         Row(

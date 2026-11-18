@@ -126,6 +126,7 @@ private fun ScreenshotCleanerApp(
     var hasNotificationPermission by remember { mutableStateOf(activity.hasNotificationPermission()) }
     var screenshots by remember { mutableStateOf<List<ScreenshotItem>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var settingsErrorMessage by remember { mutableStateOf<String?>(null) }
     var destination by remember { mutableStateOf(AppDestination.REVIEW) }
     var settingsReadAttempt by remember { mutableIntStateOf(0) }
     val settingsStates = remember(settingsRepository, settingsReadAttempt) {
@@ -264,14 +265,19 @@ private fun ScreenshotCleanerApp(
 
                 AppDestination.SETTINGS -> SettingsScreen(
                     settings = settings,
+                    errorMessage = settingsErrorMessage,
                     onRemindersEnabledChange = { enabled ->
                         coroutineScope.launch {
-                            settingsRepository.setRemindersEnabled(enabled)
+                            settingsErrorMessage = saveSettingsChange {
+                                settingsRepository.setRemindersEnabled(enabled)
+                            }
                         }
                     },
                     onScreenshotAgeDaysChange = { ageDays ->
                         coroutineScope.launch {
-                            settingsRepository.setScreenshotAgeDays(ageDays)
+                            settingsErrorMessage = saveSettingsChange {
+                                settingsRepository.setScreenshotAgeDays(ageDays)
+                            }
                         }
                     },
                     onBack = { destination = AppDestination.REVIEW }

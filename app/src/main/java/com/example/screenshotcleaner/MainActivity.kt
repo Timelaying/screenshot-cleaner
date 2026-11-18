@@ -121,6 +121,7 @@ private fun ScreenshotCleanerApp(
     val screenshotDeletion = remember(activity) { ScreenshotDeletion(activity.contentResolver) }
     var imageAccess by remember { mutableStateOf(activity.imageAccessState()) }
     var hasNotificationPermission by remember { mutableStateOf(activity.hasNotificationPermission()) }
+    var deleteRequestInFlight by remember { mutableStateOf(false) }
     var screenshots by remember { mutableStateOf<List<ScreenshotItem>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var destination by remember { mutableStateOf(AppDestination.REVIEW) }
@@ -235,16 +236,26 @@ private fun ScreenshotCleanerApp(
                         }
                     },
                     onDelete = { item ->
-                        pendingDelete.item = item
-                        try {
-                            val deletedImmediately = screenshotDeletion.request(item.uri, deleteLauncher::launch)
-                            if (deletedImmediately) {
-                                pendingDelete.item = null
-                                markDeleted(item)
+                        if (!deleteRequestInFlight && pendingDelete.item == null) {
+                            deleteRequestInFlight = true
+                            coroutineScope.launch {
+                                try {
+                                    val deletedImmediately = screenshotDeletion.request(item.uri) { request ->
+                                        // Save only requests that actually launch consent. Saving an
+                                        // in-flight IO operation would restore a result that never arrives.
+                                        pendingDelete.item = item
+                                        deleteLauncher.launch(request)
+                                    }
+                                    if (deletedImmediately) markDeleted(item)
+                                } catch (exception: CancellationException) {
+                                    throw exception
+                                } catch (exception: Exception) {
+                                    pendingDelete.item = null
+                                    errorMessage = reviewErrorMessage(exception)
+                                } finally {
+                                    deleteRequestInFlight = false
+                                }
                             }
-                        } catch (exception: Exception) {
-                            pendingDelete.item = null
-                            errorMessage = reviewErrorMessage(exception)
                         }
                     },
                     onRefresh = { refreshScreenshots() },

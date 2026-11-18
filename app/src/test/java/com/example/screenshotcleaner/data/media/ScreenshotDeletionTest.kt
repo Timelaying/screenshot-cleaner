@@ -13,8 +13,12 @@ import android.graphics.drawable.Icon
 import android.net.Uri
 import android.provider.MediaStore
 import androidx.activity.result.IntentSenderRequest
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -44,7 +48,7 @@ class ScreenshotDeletionTest {
     }
 
     @Test
-    fun androidTenConsentGrantsAccessThenRetriesTheOriginalUri() {
+    fun androidTenConsentGrantsAccessThenRetriesTheOriginalUri() = runBlocking<Unit> {
         val exception = consentRequired()
         provider.failure = exception
 
@@ -62,32 +66,32 @@ class ScreenshotDeletionTest {
     }
 
     @Test
-    fun failedRetryCannotBeReportedAsACompletedDeletionOrReopenConsent() {
+    fun failedRetryCannotBeReportedAsACompletedDeletionOrReopenConsent() = runBlocking<Unit> {
         val exception = consentRequired()
         provider.failure = exception
         assertFalse(deletion.request(uri, requests::add))
 
         assertSame(exception, assertThrows(SecurityException::class.java) {
-            deletion.finishConfirmation(uri)
+            runBlocking { deletion.finishConfirmation(uri) }
         })
         assertEquals(0, provider.deletedCount)
         assertEquals(1, requests.size)
     }
 
     @Test
-    fun retryThatDeletesNoRowsFails() {
+    fun retryThatDeletesNoRowsFails() = runBlocking<Unit> {
         provider.failure = consentRequired()
         assertFalse(deletion.request(uri, requests::add))
         provider.failure = null
         provider.rowsDeleted = 0
 
-        assertThrows(IllegalStateException::class.java) { deletion.finishConfirmation(uri) }
+        assertThrows(IllegalStateException::class.java) { runBlocking { deletion.finishConfirmation(uri) } }
         assertEquals(0, provider.deletedCount)
     }
 
     @Test
     @Config(sdk = [26, 28, 29])
-    fun writableFileIsDeletedImmediatelyWithoutConsent() {
+    fun writableFileIsDeletedImmediatelyWithoutConsent() = runBlocking<Unit> {
         assertTrue(deletion.request(uri, requests::add))
         assertEquals(listOf(uri), provider.attemptedUris)
         assertEquals(1, provider.deletedCount)
@@ -96,36 +100,76 @@ class ScreenshotDeletionTest {
 
     @Test
     @Config(sdk = [26, 28, 29])
-    fun ordinarySecurityFailurePropagatesWithoutLaunchingConsent() {
+    fun ordinarySecurityFailurePropagatesWithoutLaunchingConsent() = runBlocking<Unit> {
         val exception = SecurityException("Read permission revoked")
         provider.failure = exception
 
         assertSame(exception, assertThrows(SecurityException::class.java) {
-            deletion.request(uri, requests::add)
+            runBlocking { deletion.request(uri, requests::add) }
         })
         assertTrue(requests.isEmpty())
         assertEquals(0, provider.deletedCount)
     }
 
     @Test
-    fun consentLauncherFailurePropagatesWithoutDeleting() {
+    fun consentLauncherFailurePropagatesWithoutDeleting() = runBlocking<Unit> {
         provider.failure = consentRequired()
         val exception = IllegalStateException("Cannot launch consent")
 
         assertSame(exception, assertThrows(IllegalStateException::class.java) {
-            deletion.request(uri) { throw exception }
+            runBlocking { deletion.request(uri) { throw exception } }
         })
         assertEquals(0, provider.deletedCount)
     }
 
     @Test
     @Config(sdk = [30, 35])
-    fun androidElevenConfirmationDoesNotDeleteAgain() {
+    fun androidElevenConfirmationDoesNotDeleteAgain() = runBlocking<Unit> {
         provider.failure = SecurityException("Must not issue another delete")
 
         deletion.finishConfirmation(uri)
 
         assertTrue(provider.attemptedUris.isEmpty())
+    }
+
+    @Test
+    fun deleteAndConfirmationRetryRunOffCallerWhileConsentReturnsToCaller() = runBlocking<Unit> {
+        val callerThread = Thread.currentThread()
+        provider.failure = consentRequired()
+        var consentThread: Thread? = null
+
+        assertFalse(deletion.request(uri) { consentThread = Thread.currentThread() })
+        assertSame(callerThread, consentThread)
+        provider.failure = null
+        deletion.finishConfirmation(uri)
+
+        assertEquals(2, provider.deleteThreads.size)
+        provider.deleteThreads.forEach { assertNotSame(callerThread, it) }
+        assertEquals(1, provider.deletedCount)
+    }
+
+    @Test
+    @Config(sdk = [26, 28, 29])
+    fun directDeletionRunsOffCallerThread() = runBlocking<Unit> {
+        val callerThread = Thread.currentThread()
+        assertTrue(deletion.request(uri, requests::add))
+        assertNotSame(callerThread, provider.deleteThreads.single())
+    }
+
+    @Test
+    fun cancellationDuringProviderCallDoesNotLaunchLateConsent() = runBlocking<Unit> {
+        provider.failure = consentRequired()
+        val requestJob = launch {
+            val callerJob = coroutineContext.job
+            provider.beforeDelete = { callerJob.cancel() }
+            deletion.request(uri, requests::add)
+        }
+        requestJob.join()
+
+        assertTrue(requestJob.isCancelled)
+        assertEquals(listOf(uri), provider.attemptedUris)
+        assertTrue(requests.isEmpty())
+        assertEquals(0, provider.deletedCount)
     }
 
     private fun consentRequired(): RecoverableSecurityException {
@@ -149,10 +193,14 @@ private class DeleteProvider : ContentProvider() {
     var rowsDeleted = 1
     var deletedCount = 0
     val attemptedUris = mutableListOf<Uri>()
+    val deleteThreads = mutableListOf<Thread>()
+    var beforeDelete: () -> Unit = {}
 
     override fun onCreate(): Boolean = true
     override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int {
         attemptedUris += uri
+        deleteThreads += Thread.currentThread()
+        beforeDelete()
         failure?.let { throw it }
         deletedCount += rowsDeleted
         return rowsDeleted

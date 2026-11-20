@@ -18,6 +18,61 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ScreenshotRefreshTest {
     @Test
+    fun accessLossPreventsLateResultsWithoutStartingAReplacementScan() = runTest {
+        val releaseScan = CompletableDeferred<Unit>()
+        val refresh = ScreenshotRefresh(this) {
+            withContext(NonCancellable) { releaseScan.await() }
+            emptyList()
+        }
+
+        refresh.refresh(30, { throw AssertionError("Revoked result") }, { throw AssertionError(it) })
+        runCurrent()
+        refresh.cancel()
+        releaseScan.complete(Unit)
+        runCurrent()
+    }
+
+    @Test
+    fun accessLossPreventsLateErrorsWithoutStartingAReplacementScan() = runTest {
+        val releaseScan = CompletableDeferred<Unit>()
+        val refresh = ScreenshotRefresh(this) {
+            withContext(NonCancellable) { releaseScan.await() }
+            throw SecurityException("Access revoked during scan")
+        }
+
+        refresh.refresh(30, { throw AssertionError("Revoked result") }, { throw AssertionError(it) })
+        runCurrent()
+        refresh.cancel()
+        releaseScan.complete(Unit)
+        runCurrent()
+    }
+
+    @Test
+    fun accessRestorationCanRefreshWhileCancelledProviderIsStillFinishing() = runTest {
+        val releaseOldScan = CompletableDeferred<Unit>()
+        var scans = 0
+        var published = 0
+        val refresh = ScreenshotRefresh(this) {
+            scans++
+            if (scans == 1) withContext(NonCancellable) { releaseOldScan.await() }
+            emptyList()
+        }
+
+        refresh.refresh(30, { throw AssertionError("Revoked result") }, { throw AssertionError(it) })
+        runCurrent()
+        refresh.cancel()
+        refresh.cancel()
+        refresh.refresh(30, { published++ }, { throw AssertionError(it) })
+        runCurrent()
+        assertEquals(1, published)
+
+        releaseOldScan.complete(Unit)
+        runCurrent()
+        assertEquals(2, scans)
+        assertEquals(1, published)
+    }
+
+    @Test
     fun olderScanFinishingLastCannotReplaceTheNewAgeFilterResults() = runTest {
         val releaseOldScan = CompletableDeferred<Unit>()
         val publishedAges = mutableListOf<Long>()

@@ -139,7 +139,18 @@ private fun ScreenshotCleanerApp(
         ScreenshotRefresh(coroutineScope, repository::getPendingOldScreenshots)
     }
 
+    fun updateImageAccess() {
+        imageAccess = activity.imageAccessState()
+        if (imageAccess != ImageAccessState.FULL) {
+            // Invalidate pending results before returning to permission onboarding.
+            screenshotRefresh.cancel()
+            screenshots = emptyList()
+            errorMessage = null
+        }
+    }
+
     fun refreshScreenshots() {
+        if (imageAccess != ImageAccessState.FULL) return
         val loadedSettings = settings ?: return
         errorMessage = null
         screenshotRefresh.refresh(
@@ -171,7 +182,7 @@ private fun ScreenshotCleanerApp(
     val imagePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
-        imageAccess = activity.imageAccessState()
+        updateImageAccess()
         if (imageAccess == ImageAccessState.FULL) refreshScreenshots()
     }
 
@@ -201,7 +212,7 @@ private fun ScreenshotCleanerApp(
     }
 
     LaunchedEffect(permissionStateVersion) {
-        imageAccess = activity.imageAccessState()
+        updateImageAccess()
         hasNotificationPermission = activity.hasNotificationPermission()
     }
 

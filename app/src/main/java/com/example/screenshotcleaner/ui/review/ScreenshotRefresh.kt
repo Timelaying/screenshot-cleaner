@@ -21,14 +21,19 @@ internal class ScreenshotRefresh(
         decidedDuringRefresh += item.id
     }
 
+    fun cancel() {
+        refreshJob?.cancel()
+        refreshJob = null
+        decidedDuringRefresh.clear()
+    }
+
     fun refresh(
         ageDays: Long,
         onSuccess: (List<ScreenshotItem>) -> Unit,
         onFailure: (Throwable) -> Unit
     ) {
-        refreshJob?.cancel()
+        cancel()
         // New scans read the saved decisions from Room; only overlapping saves need this guard.
-        decidedDuringRefresh.clear()
         refreshJob = scope.launch {
             val result = try {
                 Result.success(loadScreenshots(ageDays))

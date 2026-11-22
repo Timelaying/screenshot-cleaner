@@ -19,9 +19,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -132,13 +132,14 @@ fun ReviewScreen(
 }
 
 @Composable
-private fun ScreenshotCard(
+internal fun ScreenshotCard(
     item: ScreenshotItem,
     modifier: Modifier,
     onKeep: () -> Unit,
     onDelete: () -> Unit
 ) {
-    var dragAmount by remember { mutableFloatStateOf(0f) }
+    val currentOnKeep by rememberUpdatedState(onKeep)
+    val currentOnDelete by rememberUpdatedState(onDelete)
 
     AsyncImage(
         model = item.uri,
@@ -147,11 +148,14 @@ private fun ScreenshotCard(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
             .pointerInput(item.id) {
+                // Each card owns its gesture; callbacks can change without changing its ID.
+                var dragAmount = 0f
                 detectDragGestures(
+                    onDragStart = { dragAmount = 0f },
                     onDragEnd = {
                         when (reviewDecisionForDrag(dragAmount)) {
-                            ReviewSwipeDecision.KEEP -> onKeep()
-                            ReviewSwipeDecision.DELETE -> onDelete()
+                            ReviewSwipeDecision.KEEP -> currentOnKeep()
+                            ReviewSwipeDecision.DELETE -> currentOnDelete()
                             ReviewSwipeDecision.NONE -> Unit
                         }
                         dragAmount = 0f

@@ -42,7 +42,8 @@ fun ReviewScreen(
     onOpenSettings: () -> Unit
 ) {
     val current = screenshots.firstOrNull()
-    var deleteCandidate by remember { mutableStateOf<ScreenshotItem?>(null) }
+    // Consent belongs to the displayed snapshot, and expires if a refresh changes it.
+    var deleteCandidate by remember(current) { mutableStateOf<ScreenshotItem?>(null) }
 
     Column(
         modifier = Modifier

@@ -1,5 +1,8 @@
 package com.example.screenshotcleaner.ui.onboarding
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -14,8 +17,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -27,6 +32,7 @@ fun OnboardingScreen(
     onGrantImagePermission: () -> Unit,
     onGrantNotificationPermission: () -> Unit
 ) {
+    val context = LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -59,6 +65,25 @@ fun OnboardingScreen(
             actionLabel = "Enable alerts",
             onClick = onGrantNotificationPermission
         )
+        if (!hasImagePermission || !hasNotificationPermission) {
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = "If a permission prompt no longer appears, you can change photo access and notifications in app settings.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            TextButton(
+                onClick = {
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", context.packageName, null)
+                        )
+                    )
+                }
+            ) {
+                Text("Open app settings")
+            }
+        }
     }
 }
 

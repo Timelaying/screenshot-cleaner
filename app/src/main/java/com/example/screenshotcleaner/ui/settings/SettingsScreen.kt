@@ -1,5 +1,6 @@
 package com.example.screenshotcleaner.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,6 +32,8 @@ fun SettingsScreen(
     onScreenshotAgeDaysChange: (Long) -> Unit,
     onBack: () -> Unit
 ) {
+    BackHandler(onBack = onBack)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
